@@ -24,6 +24,7 @@
 -/
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Tactic
+import Economy.CES
 
 namespace Economy
 
@@ -172,6 +173,28 @@ theorem acemoglu_macro_bound (E' : TaskEconomy n) (S : Finset (Fin n)) (c : ℝ)
       ≤ ∑ i ∈ S, E.α i * c := Finset.sum_le_sum hbnd
     _ = (∑ i ∈ S, E.α i) * c := by rw [← Finset.sum_mul]
     _ = E.exposureShare S * c := rfl
+
+
+/-! ### Grounding the Cobb-Douglas choice
+
+The aggregator `Y = ∏ᵢ (y i) ^ (α i)` is not chosen arbitrarily. It is the
+`σ → 1` neutral-elasticity limit of the CES family `(Σ αᵢ yᵢ^ρ)^(1/ρ)` with
+`ρ = (σ-1)/σ`. The full `ε-δ` derivation is in `Economy.CES.ces_to_cobb_douglas_limit`
+(Arrow-Chenery-Minhas-Solow 1961). The two-task specialization below makes
+the connection explicit: a two-task Cobb-Douglas economy is the `σ=1` limit
+of the corresponding two-task CES economy. -/
+
+/-- THEOREM (Cobb-Douglas is the σ=1 CES limit, two-task specialization):
+    for any two positive inputs `y₁, y₂` and any weight `α ∈ (0,1)`, the
+    Cobb-Douglas aggregate `y₁^α · y₂^(1-α)` is the limit of the CES
+    aggregator as `ρ → 0`. This is a re-export of
+    `Economy.CES.ces_to_cobb_douglas_limit` and GROUNDS the choice of
+    Cobb-Douglas in `TaskEconomy.Y` as the unit-elasticity neutral case. -/
+theorem cobbDouglas_as_unit_CES_limit (α y1 y2 : ℝ)
+    (hα0 : 0 < α) (hα1 : α < 1) (hy1 : 0 < y1) (hy2 : 0 < y2) :
+    ∀ ε > (0 : ℝ), ∃ δ > (0 : ℝ), ∀ ρ, 0 < |ρ| → |ρ| < δ →
+      |Economy.cesAggregate ρ α y1 y2 - y1 ^ α * y2 ^ (1 - α)| < ε :=
+  Economy.ces_to_cobb_douglas_limit α y1 y2 hα0 hα1 hy1 hy2
 
 end TaskEconomy
 

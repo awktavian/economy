@@ -182,3 +182,34 @@ happens, or reverse it altogether.)
 lake build      # full build
 make proof      # authoritative counts + soundness
 ```
+
+
+## Theoretical Grounding
+
+Every functional form in the corpus is now grounded in a stated primitive
+with a named theorem:
+
+| # | Design choice | Primitive | Grounding theorem |
+|---|---|---|---|
+| 1 | `exposureFromHorizon` | CDF of the task-horizon distribution. Current instance: uniform on `[0, Hmax]`. Alternative: Pareto `1 − (H_min/H)^α` | `exposureFromHorizon_is_uniform_cdf`; `paretoCDF` + `paretoCDF_strictMono_above_min`, `paretoCDF_tendsto_one` |
+| 2 | `sigmoidSaturation` | Logistic ODE `dI/dt = k·I·(1 − I/L)` (Verhulst 1838) | `sigmoid_satisfies_logistic_ode`, `sigmoidSaturation_midpoint` |
+| 3 | `hyperExponential` | Log-polynomial growth `log I = (t/T)^β · log 2` (Good 1965, Yudkowsky 2013) | `hyperExp_log_identity`, `hyperExp_eq_continued_at_beta_one`, `hyperExp_log_ratio` |
+| 4 | `aiWinter` | Mean-reverting linear ODE `dI/dt = −γ·(I − I_floor)` (Gordon, Cowen) | `aiWinterMeanReverting`, `aiWinterMeanReverting_tendsto_floor`, `aiWinter_eq_meanReverting_zero_floor` |
+| 5 | Matching `m(u,v) = μ·u^η·v^(1−η)` | Constant returns to scale on random search (Petrongolo-Pissarides JEL 2001) | `matchingFunction_CRS`, `matchingFunction_symmetric_at_half` |
+| 6 | Cobb-Douglas in `TaskModel.Y` | σ → 1 neutral-elasticity limit of CES (Arrow-Chenery-Minhas-Solow 1961) | `cobbDouglas_as_unit_CES_limit` (re-export of `ces_to_cobb_douglas_limit`) |
+| 7 | Two-class top-decile bound | Lorenz-curve area (Lorenz 1905, Gini 1912) | `twoClassGini`, `twoClassGini_nonneg`, `twoClassGini_positive_iff_unequal`, `topDecile_linear_bound` |
+| 8 | Doubling time `T ∈ {4, 7}` | METR log-linear regression slope `β` (TH1.1) | `doublingTimeFromSlope`, `doublingTime_metrFast`, `doublingTime_metrBaseline`, `intelligenceLevel_from_slope` |
+
+The previously ad-hoc constants `4` and `7` are now `doublingTimeFromSlope
+metrFastSlope` and `doublingTimeFromSlope metrBaselineSlope`. The functional
+forms are no longer picked out of the air — each one is either a CDF, the
+solution of a stated ODE, a homogeneity law, or a limit of a parametric
+family.
+
+**What is still irreducibly empirical**: `α ≈ 0.6` (labor share, BEA),
+`H_min ≈ 1` month (base task horizon, METR), `Hmax ≈ 12` months (saturation
+horizon, Anthropic Economic Index), `m ≈ 0.9` (MPC, BEA), `ψ_k ≈ 0.77`
+(top-decile capital ownership, Piketty-Zucman), `β_fast = log 2 / 4`
+nats/month (METR TH1.1 fast regime), `β_baseline = log 2 / 7` nats/month
+(METR 2019-25 baseline). These are calibration points, not derivable from
+more primitive assumptions.

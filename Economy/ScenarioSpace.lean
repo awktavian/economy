@@ -99,6 +99,98 @@ theorem aiWinter_pos (T t_winter decay t : ℝ) : 0 < aiWinter T t_winter decay 
   · exact Real.rpow_pos_of_pos (by norm_num) _
   · exact mul_pos (Real.rpow_pos_of_pos (by norm_num) _) (Real.exp_pos _)
 
+
+/-! ### Mean-reverting winter — floor-to-residual grounding
+
+The `aiWinter` defined above decays to 0. This is not realistic: after
+a capability retreat, a residual "floor" of capability remains (the old
+models still exist, fine-tuned specialists persist, and inference costs
+stay below the historical peak). The honest model is mean-reverting
+(Ornstein-Uhlenbeck deterministic drift) to a floor `I_floor ≥ 0`,
+governed by the ODE `dI/dt = −γ · (I − I_floor)` for `t > t_winter`.
+The unique solution with initial value `I(t_winter) = I_peak` is
+`I(t) = I_floor + (I_peak − I_floor) · exp(−γ · (t − t_winter))`.
+
+We formalize this as `aiWinterMeanReverting` and prove it tends to
+the floor (not to zero). The legacy `aiWinter` is the special case
+`I_floor = 0`.
+
+References:
+  * Hanson (2008), "Economics of the Singularity", IEEE Spectrum.
+  * Cowen (2011), "The Great Stagnation" — mean-reverting slowdown
+    hypothesis.
+  * Gordon (2016), "The Rise and Fall of American Growth" — residual
+    capability floor after technology waves.  -/
+
+/-- Mean-reverting AI-winter trajectory: during the ramp `t ≤ t_winter`
+    the curve is `2^(t/T)`; afterwards it decays exponentially to a
+    floor `I_floor` at rate `γ`, per `dI/dt = −γ (I − I_floor)`. -/
+noncomputable def aiWinterMeanReverting
+    (T t_winter decay I_floor t : ℝ) : ℝ :=
+  if t ≤ t_winter then (2 : ℝ) ^ (t / T)
+  else I_floor + ((2 : ℝ) ^ (t_winter / T) - I_floor) *
+                  Real.exp (-decay * (t - t_winter))
+
+/-- THEOREM: `aiWinterMeanReverting` tends to the floor `I_floor` as
+    `t → ∞` whenever `decay > 0`. This REPLACES `aiWinter_tendsto_zero`
+    under the mean-reverting primitive (the old version is the
+    `I_floor = 0` special case). -/
+theorem aiWinterMeanReverting_tendsto_floor
+    {T t_winter decay I_floor : ℝ} (hd : 0 < decay) :
+    Filter.Tendsto (aiWinterMeanReverting T t_winter decay I_floor)
+      Filter.atTop (nhds I_floor) := by
+  have hev : ∀ᶠ t in Filter.atTop,
+      aiWinterMeanReverting T t_winter decay I_floor t
+        = I_floor + ((2 : ℝ) ^ (t_winter / T) - I_floor) *
+                     Real.exp (-decay * (t - t_winter)) := by
+    filter_upwards [Filter.eventually_gt_atTop t_winter] with t ht
+    unfold aiWinterMeanReverting
+    rw [if_neg (not_le.mpr ht)]
+  -- exp(-decay * (t - t_winter)) → 0 as t → ∞.
+  have hlin : Filter.Tendsto (fun t : ℝ => -decay * (t - t_winter))
+      Filter.atTop Filter.atBot := by
+    have hsub : Filter.Tendsto (fun t : ℝ => t - t_winter) Filter.atTop Filter.atTop :=
+      Filter.tendsto_atTop_add_const_right _ (-t_winter) Filter.tendsto_id |>.congr
+        (fun t => by show t + -t_winter = t - t_winter; ring)
+    have hmul : Filter.Tendsto (fun t : ℝ => (t - t_winter) * decay)
+        Filter.atTop Filter.atTop := hsub.atTop_mul_const hd
+    have hneg : Filter.Tendsto (fun t : ℝ => -((t - t_winter) * decay))
+        Filter.atTop Filter.atBot := Filter.tendsto_neg_atTop_atBot.comp hmul
+    refine hneg.congr ?_
+    intro t; ring
+  have hexp : Filter.Tendsto
+      (fun t : ℝ => Real.exp (-decay * (t - t_winter))) Filter.atTop (nhds 0) :=
+    Real.tendsto_exp_atBot.comp hlin
+  -- Scale by constant and shift.
+  have hscaled :
+      Filter.Tendsto
+        (fun t : ℝ => ((2 : ℝ) ^ (t_winter / T) - I_floor) *
+                        Real.exp (-decay * (t - t_winter)))
+        Filter.atTop
+        (nhds (((2 : ℝ) ^ (t_winter / T) - I_floor) * 0)) :=
+    hexp.const_mul _
+  rw [mul_zero] at hscaled
+  have hshift :
+      Filter.Tendsto
+        (fun t : ℝ => I_floor + ((2 : ℝ) ^ (t_winter / T) - I_floor) *
+                                  Real.exp (-decay * (t - t_winter)))
+        Filter.atTop (nhds (I_floor + 0)) :=
+    hscaled.const_add I_floor
+  rw [add_zero] at hshift
+  exact hshift.congr' (Filter.EventuallyEq.symm hev)
+
+/-- THEOREM: the legacy `aiWinter` is the `I_floor = 0` special case of
+    `aiWinterMeanReverting`. This documents the grounding: `aiWinter`
+    is NOT an ad-hoc functional form — it is the floor-zero instance of
+    a mean-reverting drift governed by the linear ODE `dI/dt = −γ·I`. -/
+theorem aiWinter_eq_meanReverting_zero_floor
+    (T t_winter decay t : ℝ) :
+    aiWinter T t_winter decay t = aiWinterMeanReverting T t_winter decay 0 t := by
+  unfold aiWinter aiWinterMeanReverting
+  split_ifs
+  · rfl
+  · ring
+
 /-- THEOREM (sigmoid upper bound): `sigmoidSaturation < L` for all `t`,
     i.e. the ceiling is strict. -/
 theorem sigmoidSaturation_lt_ceiling {k L t₀ t : ℝ} (hL : 0 < L) :
@@ -108,6 +200,77 @@ theorem sigmoidSaturation_lt_ceiling {k L t₀ t : ℝ} (hL : 0 < L) :
   have hden : 0 < 1 + Real.exp (-k * (t - t₀)) := by linarith
   rw [div_lt_iff₀ hden]
   nlinarith
+
+
+/-- THEOREM (logistic ODE): `sigmoidSaturation k L t₀` satisfies the logistic
+    carrying-capacity differential equation `dI/dt = k · I · (1 − I/L)`.
+    This GROUNDS the choice of the sigmoidal form: it is (up to the initial
+    condition `I(t₀) = L/2`) the unique solution of the logistic ODE with
+    carrying capacity `L` and intrinsic rate constant `k`. Requires `L ≠ 0`.
+
+    Reference: Verhulst (1838) "Notice sur la loi que la population suit dans
+    son accroissement", Correspondance Mathématique et Physique X, 113–121. -/
+theorem sigmoid_satisfies_logistic_ode {L : ℝ} (hL : L ≠ 0) (k t₀ t : ℝ) :
+    HasDerivAt (fun s => sigmoidSaturation k L t₀ s)
+      (k * sigmoidSaturation k L t₀ t * (1 - sigmoidSaturation k L t₀ t / L)) t := by
+  -- Let e(s) = exp(-k*(s - t₀)).  Then sigmoid(s) = L * (1 + e(s))⁻¹.
+  set e : ℝ → ℝ := fun s => Real.exp (-k * (s - t₀)) with he_def
+  have he_pos : ∀ s, 0 < e s := fun s => Real.exp_pos _
+  have hden_pos : ∀ s, 0 < 1 + e s := fun s => by
+    have := he_pos s; linarith
+  have hden_ne : (1 + e t) ≠ 0 := ne_of_gt (hden_pos t)
+  -- Derivative of `-k * (s - t₀)` at t is -k.
+  have hlin : HasDerivAt (fun s : ℝ => -k * (s - t₀)) (-k) t := by
+    have h1 : HasDerivAt (fun s : ℝ => s - t₀) 1 t :=
+      (hasDerivAt_id t).sub_const t₀
+    simpa using h1.const_mul (-k)
+  -- Derivative of e(s) = exp(-k*(s-t₀)) at t is -k * e(t).
+  have he : HasDerivAt e (-k * e t) t := by
+    have h := hlin.exp
+    -- h : HasDerivAt (fun x => exp (-k*(x-t₀))) (exp(-k*(t-t₀)) * -k) t
+    have heq : Real.exp (-k * (t - t₀)) * -k = -k * e t := by
+      show _ = -k * Real.exp (-k * (t - t₀)); ring
+    rw [heq] at h
+    exact h
+  -- Derivative of (1 + e) at t is -k * e t.
+  have hden : HasDerivAt (fun s => 1 + e s) (-k * e t) t := by
+    have h := (hasDerivAt_const t (1 : ℝ)).add he
+    have hzero : (0 : ℝ) + -k * e t = -k * e t := by ring
+    rw [hzero] at h
+    exact h
+  -- Use `HasDerivAt.inv` on `1 + e` to get derivative of `(1 + e)⁻¹`.
+  have hinv : HasDerivAt (fun s => (1 + e s)⁻¹)
+      (-(-k * e t) / (1 + e t)^2) t :=
+    hden.inv hden_ne
+  -- Multiply by the constant L.
+  have hquot : HasDerivAt (fun s => L * (1 + e s)⁻¹)
+      (L * (-(-k * e t) / (1 + e t)^2)) t :=
+    hinv.const_mul L
+  -- Rewrite sigmoid as `L * (1+e)⁻¹`.
+  have hsigeq : (fun s => sigmoidSaturation k L t₀ s) = (fun s => L * (1 + e s)⁻¹) := by
+    funext s
+    unfold sigmoidSaturation
+    rw [div_eq_mul_inv]
+  rw [hsigeq]
+  convert hquot using 1
+  -- Goal: k * sigmoid t * (1 - sigmoid t / L) = L * (k * e t / (1+e t)^2)
+  -- Unfold sigmoid on LHS.
+  have hsig_t : sigmoidSaturation k L t₀ t = L / (1 + e t) := by
+    unfold sigmoidSaturation; rfl
+  rw [hsig_t]
+  have hdne2 : (1 + e t)^2 ≠ 0 := pow_ne_zero _ hden_ne
+  field_simp
+  ring
+
+/-- THEOREM (sigmoid midpoint): at `t = t₀`, the logistic curve is exactly
+    at `L/2` — the inflection point. Combined with `sigmoid_satisfies_logistic_ode`,
+    this uniquely determines the sigmoid from its first principle. -/
+theorem sigmoidSaturation_midpoint (k L t₀ : ℝ) :
+    sigmoidSaturation k L t₀ t₀ = L / 2 := by
+  unfold sigmoidSaturation
+  have : Real.exp (-k * (t₀ - t₀)) = 1 := by simp
+  rw [this]
+  norm_num
 
 /-- THEOREM (plateau freeze): after `t_now`, the Mythos trajectory is
     constant at `2^(t_now/T)`. -/
@@ -172,6 +335,53 @@ theorem hyperExp_dominates_continued_strict
   have hx : (1 : ℝ) < t / T := (one_lt_div hT).mpr ht
   have h := Real.rpow_lt_rpow_of_exponent_lt hx hβ
   simpa using h
+
+
+/-- THEOREM (hyper-exponential log identity): the logarithm of the
+    hyper-exponential curve is `(t/T)^β · log 2`. This is the exact
+    algebraic restatement that GROUNDS the functional form: we chose
+    `2^((t/T)^β)` because its log is a power-law in `t/T`, and the
+    power-law exponent `β > 1` is what makes successive doublings happen
+    FASTER than linearly in time — the defining property of recursive
+    self-improvement. For `β = 1` this collapses to the continued
+    exponential; for `β > 1` the log grows super-linearly.
+
+    Reference: Good (1965) "Speculations Concerning the First
+    Ultraintelligent Machine", Advances in Computers 6: 31–88;
+    Yudkowsky (2013) "Intelligence Explosion Microeconomics", MIRI
+    technical report. The empirical compute-centric instantiation is
+    Davidson (2023), Open Philanthropy report. -/
+theorem hyperExp_log_identity (T β t : ℝ) :
+    Real.log (hyperExponential T β t) = (t / T) ^ β * Real.log 2 := by
+  unfold hyperExponential
+  rw [Real.log_rpow (by norm_num : (0 : ℝ) < 2)]
+
+/-- THEOREM (hyperExp collapses to continued at β = 1): when `β = 1`, the
+    hyper-exponential is exactly the continued exponential. This pins the
+    "hyper" prefix to the strict inequality `β > 1`. -/
+theorem hyperExp_eq_continued_at_beta_one (T t : ℝ) :
+    hyperExponential T 1 t = continuedExponential T t := by
+  unfold hyperExponential continuedExponential
+  rw [Real.rpow_one]
+
+/-- THEOREM (hyperExp log ratio grows unboundedly in t for β > 1):
+    the ratio `log(hyperExp)/log(continued) = (t/T)^(β-1)`
+    is itself unbounded in `t` when `β > 1`. Operationally: a fixed
+    number of real-time months of hyper-exponential progress
+    corresponds to an ever-increasing number of continued-exponential
+    doublings. -/
+theorem hyperExp_log_ratio {T β t : ℝ} (hT : 0 < T) (ht : 0 < t) :
+    Real.log (hyperExponential T β t) / Real.log (continuedExponential T t)
+      = (t / T) ^ (β - 1) := by
+  have hxpos : (0 : ℝ) < t / T := div_pos ht hT
+  have hlog2 : (0 : ℝ) < Real.log 2 := Real.log_pos (by norm_num)
+  rw [hyperExp_log_identity T β t]
+  unfold continuedExponential
+  rw [Real.log_rpow (by norm_num : (0 : ℝ) < 2)]
+  rw [mul_div_mul_right _ _ (ne_of_gt hlog2)]
+  rw [show ((t / T) ^ β / (t / T)) = (t / T) ^ β / (t / T) ^ (1 : ℝ) from by
+    rw [Real.rpow_one]]
+  rw [← Real.rpow_sub hxpos]
 
 /-- Helper: `t/T → ∞` as `t → ∞` for `T > 0`. -/
 private lemma tendsto_div_const_atTop {T : ℝ} (hT : 0 < T) :

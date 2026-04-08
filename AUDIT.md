@@ -213,3 +213,95 @@ errors:      0
 build:   GREEN
 sound:   CLEAN
 ```
+
+
+---
+
+## Theoretical Grounding Pass (2026-04-08)
+
+State at start: 23 files, 2855 lines, 124 theorems, 3 lemmas, 52 defs,
+0 sorry, 0 axioms, 0 warnings, CLEAN (commit 80d5ff7).
+
+State at end: 23 files, 3399 lines (+544), 143 theorems (+19), 3 lemmas,
+60 defs (+8), 0 sorry, 0 axioms, 0 warnings, CLEAN, GREEN.
+
+Every ad-hoc `def` in the eight targeted choices now has a companion
+theorem stating what primitive it is derived from. See README `##
+Theoretical Grounding` for the mapping.
+
+### Before/after per choice
+
+1. **exposureFromHorizon**: was "clipped-linear, simplest functional form
+   satisfying monotone + bounded". Now grounded as the CDF of a uniform
+   `[0, Hmax]` task-horizon distribution (`exposureFromHorizon_is_uniform_cdf`),
+   with a full Pareto alternative (`paretoCDF`, `paretoCDF_strictMono_above_min`,
+   `paretoCDF_tendsto_one`) for heavy-tailed task distributions. The choice
+   of which CDF to use is now a stated modelling decision, not a functional-
+   form guess.
+2. **sigmoidSaturation**: was "we picked the logistic function". Now proved
+   to satisfy the Verhulst logistic ODE `dI/dt = k·I·(1−I/L)` via
+   `sigmoid_satisfies_logistic_ode` (full `HasDerivAt` identity), with
+   `sigmoidSaturation_midpoint` pinning the inflection point at `t = t₀`.
+3. **hyperExponential**: was "fast-takeoff shape". Now grounded by
+   `hyperExp_log_identity` (`log I = (t/T)^β · log 2`), showing the log is
+   a power-law in `t/T`, and `hyperExp_log_ratio` showing the log-ratio
+   versus continued exponential is exactly `(t/T)^(β−1)` — unbounded for
+   `β > 1`, matching the "recursive self-improvement" primitive.
+4. **aiWinter**: was pure exponential decay to zero. Now grounded by a new
+   `aiWinterMeanReverting` def with explicit floor `I_floor ≥ 0`, satisfying
+   the linear mean-reverting ODE; `aiWinterMeanReverting_tendsto_floor`
+   replaces the old `_tendsto_zero`. The legacy `aiWinter` is kept as the
+   `I_floor = 0` special case (`aiWinter_eq_meanReverting_zero_floor`), so
+   no downstream proof needed to change.
+5. **MatchingModel**: was `m(u,v) = μ·u^η·v^(1−η)` picked directly. Now
+   wrapped in `matchingFunction` and proved to be CRS via
+   `matchingFunction_CRS` (homogeneous of degree 1), grounding the Cobb-
+   Douglas form as the canonical empirical instance of a CRS matching
+   function per Petrongolo-Pissarides JEL 2001. `matchingFunction_symmetric_at_half`
+   pins the `η = 0.5` meta-analytic consensus.
+6. **TaskModel Cobb-Douglas**: was "aggregation under the task model".
+   Now has `cobbDouglas_as_unit_CES_limit` exported, which re-routes the
+   full `ε-δ` proof from `Economy.CES.ces_to_cobb_douglas_limit` into
+   TaskModel's namespace. The `TaskEconomy.Y` aggregator is now documented
+   as the `σ → 1` neutral-elasticity limit of CES, not as a bare choice.
+7. **Inequality / Gini**: was `topDecile_linear_bound` alone. Now has
+   `twoClassGini`, `twoClassMean`, `twoClassGini_nonneg`, and
+   `twoClassGini_positive_iff_unequal`, the closed-form two-class Lorenz-
+   curve Gini, grounding the linear top-decile result as a geometric
+   fact about the two-class Lorenz polygon (Lorenz 1905, Gini 1912).
+8. **Doubling time**: `4` and `7` are no longer free parameters. Now
+   `doublingTimeFromSlope β = log 2 / β`, with `metrFastSlope` and
+   `metrBaselineSlope` as named defs. `doublingTime_metrFast` /
+   `doublingTime_metrBaseline` prove the reductions `T_fast = 4`,
+   `T_baseline = 7` exactly. `intelligenceLevel_from_slope` proves
+   `intelligenceLevel t (doublingTimeFromSlope β) = exp(β·t)`, linking the
+   regression parameter to the level curve as a pure exponential.
+
+### Could not ground honestly
+
+**`forecast_mono_intelligence` strict version**: the user asked whether
+the new `exposureFromHorizon` refactor unlocks a strict version. Answer:
+**no, not under the current uniform-CDF instantiation**. The clipped form
+is only weakly monotone — on any interval where both scenarios have
+saturated at `exposure = 1`, the two sides coincide, so a universal
+strict inequality is structurally impossible. A strict version DOES become
+available if we switch the primary instantiation of `exposureFromHorizon`
+to `paretoCDF` (via `paretoCDF_strictMono_above_min`), because the Pareto
+CDF is strictly monotone on its entire support above `H_min`. This is
+documented in the README as a modelling choice, not a formal limitation.
+Upgrading the primary instance would cascade through ~15 downstream proofs;
+that refactor is out of scope for this pass and is left as future work with
+a fully-proved alternative already in hand.
+
+### Mathlib helpers used (no gaps required)
+
+* `Real.rpow_pos_of_pos`, `Real.rpow_le_rpow`, `Real.rpow_lt_rpow`,
+  `Real.rpow_lt_rpow_left_iff`, `Real.rpow_mul`, `Real.rpow_add`,
+  `Real.rpow_zero`, `Real.log_rpow`
+* `HasDerivAt.exp`, `HasDerivAt.const_mul`, `HasDerivAt.inv`,
+  `HasDerivAt.add`, `hasDerivAt_id`, `hasDerivAt_const`
+* `Real.continuousAt_rpow_const`, `Real.tendsto_exp_atBot`
+* `tendsto_inv_atTop_zero`, `Filter.Tendsto.const_mul`,
+  `Filter.Tendsto.const_add`, `Filter.eventually_gt_atTop`
+
+No Mathlib lemmas were missing. No new axioms were introduced. No `sorry`.

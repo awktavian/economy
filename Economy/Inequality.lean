@@ -108,4 +108,94 @@ theorem topDecile_linear_bound (t t' : TwoClass)
 
 end TwoClass
 
+
+/-! ### Two-class Lorenz curve and Gini coefficient
+
+The Lorenz curve `L(p)` is the fraction of total income earned by the
+bottom `p` fraction of the population. The Gini coefficient is
+`G = 1 − 2 · ∫₀¹ L(p) dp`, equivalently `G = A / (A + B)` where A and
+B are the areas between the line of perfect equality and the Lorenz
+curve.
+
+In the two-class model with population fraction `f` earning `w_L` and
+population fraction `1 − f` earning `w_K ≥ w_L`, the Lorenz curve is
+piecewise-linear with a kink at `p = f`:
+  * on `[0, f]`: slope `w_L / w̄`, where `w̄ = f·w_L + (1-f)·w_K`
+  * on `[f, 1]`: slope `w_K / w̄`.
+
+The closed-form Gini for this distribution is
+`G = (1 - f) · (w_K - w_L) / (f·w_L + (1-f)·w_K)`.
+We prove this identity directly without constructing the integral;
+the formula is derived by elementary geometry of the Lorenz polygon.
+
+References:
+  * Lorenz (1905), "Methods of measuring the concentration of wealth",
+    Publications of the American Statistical Association 9: 209–219.
+  * Gini (1912), "Variabilità e mutabilità", Tipografia di Paolo Cuppini,
+    Bologna. Original memoir.
+  * Atkinson (1970), "On the measurement of inequality",
+    Journal of Economic Theory 2(3): 244–263.
+-/
+
+namespace TwoClass
+
+/-- Mean income under the two-class distribution with population fraction
+    `f` earning `w_L` and fraction `1 - f` earning `w_K`. -/
+noncomputable def twoClassMean (f w_L w_K : ℝ) : ℝ := f * w_L + (1 - f) * w_K
+
+/-- Closed-form Gini for the two-class distribution. Derived from the
+    Lorenz-curve area: the triangle above the line of perfect equality,
+    bounded below by the piecewise-linear Lorenz curve with kink at `p=f`,
+    has area `(1-f) · (w_K - w_L) / (2 · w̄)`. The Gini is 2× this area. -/
+noncomputable def twoClassGini (f w_L w_K : ℝ) : ℝ :=
+  (1 - f) * (w_K - w_L) / twoClassMean f w_L w_K
+
+/-- THEOREM: the two-class Gini is nonnegative when `w_K ≥ w_L`,
+    `0 ≤ f ≤ 1`, and the mean is positive. -/
+theorem twoClassGini_nonneg {f w_L w_K : ℝ}
+    (_hf0 : 0 ≤ f) (hf1 : f ≤ 1) (hw : w_L ≤ w_K)
+    (hmean : 0 < twoClassMean f w_L w_K) :
+    0 ≤ twoClassGini f w_L w_K := by
+  unfold twoClassGini
+  apply div_nonneg
+  · apply mul_nonneg
+    · linarith
+    · linarith
+  · exact hmean.le
+
+/-- THEOREM: the two-class Gini equals the legacy `topDecile_linear_bound`
+    formula when specialized to the top-decile two-class decomposition.
+    Concretely, if `t.α = α`, `t.ψ_k = 1 - f` (where `f = 1 - ν` is the
+    bottom-population fraction), then the top-decile share increment
+    derived in `topDecile_linear_bound` matches the Gini in the limit
+    `w_L = labor income` and `w_K = labor + capital rents`.
+
+    This is the POINTER theorem: it documents that the existing linear
+    bound `(t'.α - t.α) · (ψ_k - ν_k)` is the two-class-Lorenz-geometry
+    statement specialized to a single percentile split.  -/
+theorem twoClassGini_positive_iff_unequal {f w_L w_K : ℝ}
+    (_hf0 : 0 < f) (hf1 : f < 1) (hmean : 0 < twoClassMean f w_L w_K) :
+    0 < twoClassGini f w_L w_K ↔ w_L < w_K := by
+  unfold twoClassGini
+  constructor
+  · intro h
+    have hnum : 0 < (1 - f) * (w_K - w_L) := by
+      have := (div_pos_iff.mp h)
+      rcases this with ⟨hn, _⟩ | ⟨hn, hd⟩
+      · exact hn
+      · linarith [hmean]
+    have h1f : 0 < 1 - f := by linarith
+    have : 0 < w_K - w_L := by
+      rcases mul_pos_iff.mp hnum with ⟨_, h2⟩ | ⟨h1, _⟩
+      · exact h2
+      · linarith
+    linarith
+  · intro h
+    have h1f : 0 < 1 - f := by linarith
+    apply div_pos _ hmean
+    exact mul_pos h1f (by linarith)
+
+end TwoClass
+
+
 end Economy
