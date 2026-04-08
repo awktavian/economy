@@ -54,26 +54,6 @@ def acemoglu_tfp_10yr : ObservedEffect :=
 def goldman_gdp_10yr : ObservedEffect :=
   ⟨(7 : ℝ) / 100, "Goldman 10yr GDP high estimate"⟩
 
-/-- THEOREM: the API automation share is in [0,1]. -/
-theorem anthropic_api_in_unit :
-    0 ≤ anthropic_api_automation.value ∧ anthropic_api_automation.value ≤ 1 := by
-  unfold anthropic_api_automation
-  refine ⟨?_, ?_⟩ <;> norm_num
-
-/-- THEOREM: Acemoglu's point estimate is below Goldman's high estimate. -/
-theorem acemoglu_below_goldman_observation :
-    acemoglu_tfp_10yr.value < goldman_gdp_10yr.value := by
-  unfold acemoglu_tfp_10yr goldman_gdp_10yr
-  norm_num
-
-/-- THEOREM (BCC signs): the BCC young effect is negative, the older is
-    positive — i.e., the Brynjolfsson result is a bimodal generational
-    split, not a uniform decline. -/
-theorem brynjolfsson_bimodal :
-    brynjolfsson2025_young.value < 0 ∧ 0 < brynjolfsson2025_older.value := by
-  unfold brynjolfsson2025_young brynjolfsson2025_older
-  refine ⟨?_, ?_⟩ <;> norm_num
-
 end
 
 end Economy

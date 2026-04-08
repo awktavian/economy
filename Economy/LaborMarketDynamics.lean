@@ -61,19 +61,6 @@ theorem beveridge_shift_from_ai
     sequence and prove a sufficient condition. -/
 def sahmTriggered (u3 u12min : ℝ) : Prop := u3 - u12min ≥ 5 / 1000
 
-/-- THEOREM (Sahm rule trigger condition, sufficient): if the current 3-month
-    moving average exceeds the 12-month minimum by 0.6pp, the Sahm rule is
-    triggered. (The BLS March 2026 4.3% reading satisfies this.) -/
-theorem sahm_rule_sufficient {u3 u12min : ℝ} (h : u3 - u12min ≥ 6 / 1000) :
-    sahmTriggered u3 u12min := by
-  unfold sahmTriggered
-  linarith
-
-/-- THEOREM (Sahm monotonicity): if `u3` rises with `u12min` held fixed,
-    the gap grows monotonically. -/
-theorem sahm_gap_mono_u3 {u3 u3' u12min : ℝ} (h : u3 ≤ u3') :
-    u3 - u12min ≤ u3' - u12min := by linarith
-
 /-- Two-cohort labor market: experienced workers (reinstatement rate r_exp)
     and entrants (reinstatement rate r_ent, typically 0 under displacement). -/
 structure TwoCohort where
@@ -87,16 +74,6 @@ structure TwoCohort where
   r_ent_nn : 0 ≤ r_ent
 
 namespace TwoCohort
-
-/-- THEOREM (young worker displacement lower bound, Brynjolfsson-Chandar-Chen):
-    when entrant reinstatement is zero, the entrant cohort's unemployment
-    gap relative to experienced is at least `sep_ent − r_exp · 1`. In the
-    zero-reinstatement + high-separation corner, entrant unemployment is
-    strictly worse. -/
-theorem entrant_worse_than_experienced (c : TwoCohort)
-    (hr_ent : c.r_ent = 0) (h : c.r_exp < c.sep_ent) :
-    c.r_exp - c.r_ent < c.sep_ent - 0 := by
-  rw [hr_ent]; linarith
 
 end TwoCohort
 

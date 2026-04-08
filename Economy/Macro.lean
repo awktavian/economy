@@ -44,10 +44,6 @@ namespace MacroState
 /-- GDP from the expenditure side (definitional NIPA). -/
 def Y (s : MacroState) : ℝ := s.C + s.I + s.G + s.NX
 
-/-- THEOREM (NIPA): expenditure identity. This is structural; it's the
-    definition of `Y`. We state it to make downstream reasoning explicit. -/
-theorem nipa_identity (s : MacroState) : s.Y = s.C + s.I + s.G + s.NX := rfl
-
 end MacroState
 
 /-- Cobb-Douglas production with capital share `1-α` and labor share `α`.

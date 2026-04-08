@@ -31,10 +31,6 @@ structure ExposureShare where
 
 namespace ExposureShare
 
-/-- THEOREM: exposure shares are in [0,1]. -/
-theorem bounded (p : ExposureShare) : 0 ≤ p.val ∧ p.val ≤ 1 :=
-  ⟨p.nonneg, p.le_one⟩
-
 /-- The zero share. -/
 def zero : ExposureShare := ⟨0, le_refl 0, by norm_num⟩
 

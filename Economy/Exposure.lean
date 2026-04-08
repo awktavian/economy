@@ -48,14 +48,4 @@ theorem aggregateExposure_mono_right {w : ℝ} {p q q' : ExposureShare}
   have h1w : 0 ≤ 1 - w := by linarith
   nlinarith
 
-/-- THEOREM: refining a task (splitting into two exposed sub-tasks of
-    possibly-different shares, with weights summing to the original weight)
-    preserves the aggregate. Stated as: aggregate with identical sub-shares
-    is just that share. -/
-theorem aggregateExposure_const {w : ℝ} (p : ExposureShare)
-    (hw0 : 0 ≤ w) (hw1 : w ≤ 1) :
-    aggregateExposure w p p = p.val := by
-  unfold aggregateExposure
-  ring
-
 end Economy

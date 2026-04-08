@@ -26,6 +26,7 @@ Every file opens with one of four labels:
 | `FinanceRealCoupling` | `ghost_gdp_dominates_iff` — net growth positive iff capex+TFP > consumption drag |
 | `Forecast` | `metr_fast_dominates_baseline` — T=4mo dominates T=7mo at every future t ≥ 0 |
 | `Inequality` | `TwoClass.topDecile_rises_with_capital_share` — Piketty linear bound, two-class case |
+| `ScenarioSpace` | `gdp_dominance_from_intelligence_dominance` — pointwise trajectory dominance lifts to GDP dominance across all five canonical futures |
 
 ## Parameter dictionary
 
@@ -79,6 +80,101 @@ simultaneously. This is the recession-alongside-record-profits structure.
 - **Fast intelligence growth dominates slow at every future t**
   (`metr_fast_dominates_baseline`): the METR 4-month doubling invalidates the
   Acemoglu 0.66%/10yr point estimate as a central case.
+
+## The Five Futures
+
+`Economy/ScenarioSpace.lean` lifts the model from a single doubling time to
+a typed family of five canonical intelligence trajectories. Each is a
+real-valued function `ℝ → ℝ` (intelligence as a function of months) with
+its own characterizing theorem, its own asymptotic behavior, and its own
+induced GDP trajectory via the `gdp_dominance_from_intelligence_dominance`
+composition theorem.
+
+| # | Trajectory | Definition | Meaning | Characterizing theorem |
+|---|---|---|---|---|
+| 1 | `mythosPlateau t_now T` | `2^(t/T)` then frozen at `t_now` | Capability stops at Mythos — frontier freeze | `mythos_plateau_corollary` — gA saturates |
+| 2 | `continuedExponential T` | `2^(t/T)` | METR 2026 doubling extrapolates indefinitely | `continuedExponential_tendsto_atTop` |
+| 3 | `sigmoidSaturation k L t₀` | `L / (1 + exp(−k(t−t₀)))` | AGI ceiling — hard asymptote `L` | `sigmoidSaturation_lt_ceiling` |
+| 4 | `hyperExponential T β` | `2^((t/T)^β)`, `β>1` | Recursive self-improvement / fast takeoff | `hyperExp_dominates_continued` |
+| 5 | `aiWinter T t_w decay` | `2^(t/T)` then `· exp(−decay·(t−t_w))` | Regulation / energy / data wall; capability retreats | `aiWinter_tendsto_zero` |
+
+All five are unified by `inductive Trajectory` with evaluator
+`Trajectory.eval : Trajectory → ℝ → ℝ` and positivity theorem
+`Trajectory.eval_pos` under a `WellParam` well-parameterization predicate.
+
+## Provable Dominance Lattice
+
+```
+                       hyperExponential           (fast takeoff)
+                               │ hyperExp_dominates_continued (t ≥ T, β > 1)
+                               ▼
+                       continuedExponential        (null hypothesis)
+                   ┌───────────┼───────────┐
+continued_dominates_plateau    │   continued_eventually_above_sigmoid
+                   ▼           │           ▼
+             mythosPlateau     │        sigmoidSaturation
+           (Mythos freeze)     │        (AGI ceiling)
+                               │
+                               ▼ continued_eventually_above_winter
+                            aiWinter
+                          (retreats to 0)
+                          aiWinter_tendsto_zero
+```
+
+Each edge is a named theorem in `ScenarioSpace.lean`. The lattice lifts to
+log-GDP deviation via `gdp_dominance_from_intelligence_dominance`:
+pointwise trajectory ordering implies pointwise GDP ordering, for any
+fixed scenario parameters. Concretely:
+
+- `plateau_below_continued_GDP` — Mythos GDP ≤ continued GDP everywhere
+- `hyperExp_corollary` — continued GDP ≤ hyper-exp GDP for `t ≥ T`
+- `welfare_can_diverge_under_any_trajectory` — welfare-GDP gap exists in
+  every branch of the lattice
+
+## What the Lattice Says
+
+**Every future has welfare-divergence cases.** The theorem
+`welfare_can_diverge_under_any_trajectory` is not parameterized by which
+trajectory you pick — the Acemoglu-Restrepo labor-share-collapse witness
+runs independently of the intelligence curve. In the space of possible
+futures, there is no trajectory that automatically closes the welfare
+gap. The gap is a feature of the LABOR-SHARE channel, not a feature of
+doubling speed.
+
+**Mythos plateau does not close the labor gap.** Under
+`mythos_plateau_corollary`, the TFP-channel growth rate `gA` eventually
+saturates to a constant — more Mythos-level capability does not arrive.
+But `welfare_can_diverge_under_any_trajectory` still applies to the
+frozen trajectory. A frontier freeze at today's level locks in the
+labor-share dynamics that already exist; it does not reverse them.
+
+**AI winter does not unwind displacement.** Under
+`aiWinter_tendsto_zero`, the intelligence level returns to zero, but
+`winter_displacement_does_not_unwind` shows that the TFP-channel gA at
+`t_winter` is strictly positive whenever `cost > 0` and `t_winter > 0`.
+The integrated growth contribution by the freeze time is locked in. Even
+if capability retreats completely, the displacement wave that happened
+on the way up does not run backwards.
+
+## Headline GDP numbers at t = 36 months
+
+Using `metrFastScenario` parameters (T=4, H₀=1, Hmax=12, α=0.6,
+gK=0.003, cost=0.175) plugged into `trajectoryLogGDP`:
+
+| Trajectory | Param | `intelligenceLevel(36)` | `logGDPDeviation(36)` |
+|---|---|---|---|
+| mythosPlateau, freeze at t_now=0 | frozen at 1 | 1.0 | (0 + 0.0012)·36 ≈ **0.043** |
+| continuedExponential, T=4 | `2^9 = 512` | saturated at Hmax | (0.175 + 0.0012)·36 ≈ **6.34** |
+| sigmoidSaturation, L=100, k=0.1, t₀=18 | logistic | 73.1 at t=36 | saturated, ≈ **6.34** |
+| hyperExponential, T=4, β=1.2 | `2^(9^1.2)` | `2^13.2 ≈ 9441` | saturated, ≈ **6.34** |
+| aiWinter, T=4, t_w=18, d=0.1 | decay after 18 | `2^4.5 · exp(-1.8) ≈ 3.7` | ≈ **5.1** (mixed phase) |
+
+(The saturation at Hmax=12 months of horizon compresses fast/sigmoid/
+hyper-exp to the same asymptote; the dominance lattice is strict in the
+PRE-saturation regime and in the dominance ordering itself, not in the
+post-saturation equilibrium. This is why the `sigmoid` and `winter`
+scenarios matter economically: they shift the time at which saturation
+happens, or reverse it altogether.)
 
 ## Build
 

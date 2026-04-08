@@ -60,8 +60,6 @@ theorem y_pos (i : Fin n) : 0 < E.y i := by
   unfold y
   exact mul_pos (E.A_pos i) (E.input_pos i)
 
-theorem y_ne_zero (i : Fin n) : E.y i ≠ 0 := ne_of_gt (E.y_pos i)
-
 /-- Aggregate Cobb-Douglas output: `Y = ∏ᵢ (y i)^(α i)`. -/
 noncomputable def Y : ℝ := ∏ i, (E.y i) ^ (E.α i)
 
@@ -77,16 +75,6 @@ theorem log_Y_eq : Real.log (E.Y) = ∑ i, E.α i * Real.log (E.y i) := by
     rw [Real.log_rpow (E.y_pos i)]
   · intro i _
     exact (Real.rpow_pos_of_pos (E.y_pos i) _).ne'
-
-/-- THEOREM: the task weights are individually ≤ 1.
-    (Follows from nonneg + sum=1.) -/
-theorem alpha_le_one (i : Fin n) : E.α i ≤ 1 := by
-  have h := E.alpha_sum_one
-  have hi : E.α i ≤ ∑ j, E.α j := by
-    have := Finset.single_le_sum (f := E.α)
-      (fun j _ => E.alpha_nonneg j) (Finset.mem_univ i)
-    simpa using this
-  linarith
 
 /-- The *exposure share* of a subset `S ⊆ Fin n` of tasks: the sum of their
     Cobb-Douglas weights. In the task model, the exposure share is the
@@ -112,12 +100,6 @@ theorem exposureShare_mono {S T : Finset (Fin n)} (h : S ⊆ T) :
   unfold exposureShare
   exact Finset.sum_le_sum_of_subset_of_nonneg h
     (fun i _ _ => E.alpha_nonneg i)
-
-/-- THEOREM: adding a task to an empty exposure set yields its own α-weight. -/
-theorem exposureShare_singleton (i : Fin n) :
-    E.exposureShare {i} = E.α i := by
-  unfold exposureShare
-  simp
 
 /-- THEOREM (Hulten decomposition, discrete form):
     If productivities change from `A` to `A'` while `ψ, k, ℓ` stay fixed, then

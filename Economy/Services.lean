@@ -92,13 +92,6 @@ theorem baumol_bowen_drag {sE gP : ℝ} (hsE0 : 0 ≤ sE) (hsE1 : sE ≤ 1)
   unfold aggregateGrowth
   nlinarith
 
-/-- THEOREM (Baumol-Bowen drag, rewritten): aggregate growth equals
-    `gP - sS · gP` where `sS = 1 - sE` is the stagnant share. The drag term
-    `sS · gP` is nonnegative and strictly positive when sS > 0 and gP > 0. -/
-theorem baumol_bowen_drag_eq {sE gP : ℝ} :
-    aggregateGrowth sE gP = gP - (1 - sE) * gP := by
-  unfold aggregateGrowth; ring
-
 /-- THEOREM (drag strictness): if the stagnant share is strictly positive and
     the progressive growth rate is strictly positive, the aggregate growth
     rate is strictly below `gP`. -/

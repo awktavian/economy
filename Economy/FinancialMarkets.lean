@@ -93,43 +93,4 @@ theorem PV_antitone_rate_two {r r' : ℝ} (hr : 0 < 1 + r) (hr' : 0 < 1 + r')
     apply (div_lt_div_iff_of_pos_left hC hposr' hposr).mpr hltsum
   linarith
 
-/-- THEOREM (Gordon growth, finite horizon witness): for a single-period PV
-    of a "growing dividend" `C₀` at discount `r` with growth `g < r`, the
-    one-period PV is `C₀ / (1+r)`. This is the base case of the Gordon formula;
-    the full infinite-sum version is a geometric series identity. -/
-theorem PV_one_period (C₀ r : ℝ) :
-    PV 1 (fun _ => C₀) r = C₀ := by
-  unfold PV
-  simp
-
-/-- THEOREM (Gordon growth, structural form): for the two-period growing
-    perpetuity with C₀ now and C₀·(1+g)/(1+r) next period, the PV equals
-    `C₀ · (1 + (1+g)/(1+r))`. This is the finite Gordon prefix. -/
-theorem gordon_two_period_growing (C₀ r g : ℝ) (hr : 0 < 1 + r) :
-    PV 2 (fun i => if i = 0 then C₀ else C₀ * (1 + g)) r
-      = C₀ + C₀ * (1 + g) / (1 + r) := by
-  unfold PV
-  simp [Finset.sum_range_succ, Finset.sum_range_zero]
-
-/-- THEOREM (capex-earnings gap): free cash flow = profit − capex. When capex
-    exceeds profit, FCF is negative and the firm must finance the gap externally.
-    This is the structural form of the 2026 hyperscaler debt issuance story. -/
-theorem capex_earnings_gap {profit capex : ℝ} (h : profit < capex) :
-    profit - capex < 0 := by linarith
-
-/-- THEOREM (earnings channel — equity value scales with margin): if profit
-    margin rises by δ and price-earnings ratio stays constant, equity value
-    rises by δ × revenue × PE. -/
-theorem earnings_channel (revenue pe δ margin0 : ℝ)
-    (_hrev : 0 ≤ revenue) (_hpe : 0 ≤ pe) (_hδ : 0 ≤ δ) :
-    (revenue * (margin0 + δ)) * pe - (revenue * margin0) * pe
-      = δ * revenue * pe := by
-  ring
-
-/-- THEOREM (debt sustainability): debt is sustainable iff cash flow growth
-    exceeds debt service rate. Stated as an inequality. -/
-theorem debt_sustainable_iff (gCF rate : ℝ) :
-    (rate < gCF) ↔ 0 < gCF - rate := by
-  constructor <;> intro h <;> linarith
-
 end Economy

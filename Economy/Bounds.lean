@@ -105,11 +105,6 @@ theorem acemoglu_below_goldman_parameterized (p q : TFPParams)
   rw [acemoglu_low_corner p hpx hpc hpf, goldman_high_corner q hqx hqc hqf]
   norm_num
 
-/-- THEOREM (envelope width): the literature envelope spans a factor of 16
-    between lower and upper corners. This is the "width of disagreement"
-    in the published range and explains why headlines vary so much. -/
-theorem litBox_width : (12 : ℝ) / 100 / (75 / 10000) = 16 := by norm_num
-
 end
 
 end Economy

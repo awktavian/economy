@@ -19,3 +19,4 @@ import Economy.FinanceRealCoupling
 import Economy.LaborMarketDynamics
 import Economy.Forecast
 import Economy.Inequality
+import Economy.ScenarioSpace

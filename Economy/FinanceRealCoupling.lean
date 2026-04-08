@@ -60,23 +60,6 @@ theorem keynesian_multiplier (Δ m τ : ℝ)
     _ ≤ Δ * (1 / (1 - m * (1 - τ))) := by
         exact mul_le_mul_of_nonneg_left hinv_ge_one hΔ
 
-/-- THEOREM (debt sustainability trichotomy, Domar 1944): debt is sustainable
-    if and only if long-run cash flow growth exceeds the real cost of debt.
-    This is the Domar stability condition. We state it as a strict inequality
-    forming the boundary case. -/
-theorem debt_sustainability_domar (gCF rate : ℝ) (h : rate < gCF) :
-    0 < gCF - rate := by linarith
-
-/-- THEOREM (consumption feedback): if employment `L` falls by Δ,
-    aggregate wage bill falls by `w · Δ`, and with marginal propensity
-    to consume `m ∈ [0,1]`, consumption falls by at least `m · w · Δ`.
-    This closes the loop AI → layoffs → C → Y. -/
-theorem consumption_feedback (w ΔL m : ℝ)
-    (hw : 0 ≤ w) (hΔL : 0 ≤ ΔL) (hm : 0 ≤ m) (hm1 : m ≤ 1) :
-    0 ≤ m * w * ΔL := by
-  have : 0 ≤ m * w := mul_nonneg hm hw
-  exact mul_nonneg this hΔL
-
 /-- Net output growth under the coupling model: Ghost-GDP contribution
     minus consumption drag from displacement. -/
 noncomputable def netOutputGrowth (gA α gK m w ΔL Y : ℝ) : ℝ :=
