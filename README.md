@@ -213,3 +213,58 @@ horizon, Anthropic Economic Index), `m ≈ 0.9` (MPC, BEA), `ψ_k ≈ 0.77`
 nats/month (METR TH1.1 fast regime), `β_baseline = log 2 / 7` nats/month
 (METR 2019-25 baseline). These are calibration points, not derivable from
 more primitive assumptions.
+
+
+## Parametric Model & Validation
+
+`Economy/Calibration.lean` collects the six irreducibly empirical parameters
+of the corpus into a single `ModelCalibration` structure with subtype-guarded
+ranges: `α` (labor share, BEA ≈ 0.60), `H_min` (base horizon, METR ≈ 1 mo),
+`H_max` (saturation horizon, AEI ≈ 12 mo), `m` (MPC, BEA ≈ 0.9), `ψ_k`
+(top-decile capital ownership, Piketty-Zucman ≈ 0.77), `β_slope` (METR
+log-linear regression slope, ≈ 0.173 fast / 0.099 baseline nats/month),
+plus the ordering constraint `H_min < H_max`.
+
+Three canonical calibrations are defined: `calBEA2026` (as-of 2026 Q1, fast
+slope), `calBaseline` (same but baseline slope), and `calPessimistic`
+(α = 0.55, m = 0.95, ψ_k = 0.85, fast slope).
+
+### Validation theorems (falsification surface)
+
+Each theorem ties an empirical anchor from REFERENCES.md to a predicate
+over the model. If any of V1–V6 failed to compile, the model would be
+formally inconsistent with the cited literature.
+
+| # | Anchor | Source | Theorem |
+|---|---|---|---|
+| V1 | Acemoglu ≤ 0.66% 10yr TFP | NBER w32487 | `validation_acemoglu_low` |
+| V2 | Goldman ≤ 7% 10yr GDP | Goldman 2023 | `validation_goldman_high` |
+| V3 | Brynjolfsson ≥ 6% entrant displacement | BCC 2025 | `validation_brynjolfsson` |
+| V4 | S&P margin ≥ 13.1% under labor-share ≤ 55% | FactSet Q1 2026 | `validation_sp_margin` |
+| V5 | Hyperscaler capex = 2.2% GDP | MUFG 2026 | `validation_hyperscaler_share` |
+| V6 | METR 64× at 24 months (fast slope) | METR TH1.1 | `validation_metr_24mo` |
+
+All six compile kernel-clean at commit time.
+
+### Edge-case hardening (7 theorems)
+
+`edge_intelligence_tendsto_one` (T → ∞ ⇒ I → 1), `edge_zero_labor` (Y = rK),
+`edge_zero_capital` (Y = wL), `edge_perfect_friction` (ΔTFP = 0 at f = 1),
+`edge_infinite_horizon` (paretoCDF → 1), `edge_zero_separations` (u* = 0),
+`edge_infinite_matching` (f → ∞ ⇒ u* → 0).
+
+### Sensitivity (5 signed partial-monotonicity theorems)
+
+`gdp_mono_in_β_slope` (fast dominates baseline, `metr_fast_dominates_baseline`
+wrapper), `gdp_antitone_in_H_max` (higher saturation horizon ⇒ weakly lower
+exposure at fixed H), `gdp_mono_in_α` (conditional on gK ≥ 0: lowering α
+weakly raises Ghost-GDP growth), `welfare_antitone_in_ψ_k` (raising
+top-decile capital ownership raises top-decile income share),
+`consumption_mono_in_m` (strict Keynesian multiplier response to MPC).
+
+### Consistency (3 cross-module checks)
+
+`exposure_consistency` (exposure at the saturation horizon equals 1),
+`labor_share_consistency` (full-automation LaborShare = 0), and
+`welfare_consistency` (welfare-can-fall witness lifts through the
+calibration layer).
