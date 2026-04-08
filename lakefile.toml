@@ -1,0 +1,11 @@
+name = "economy"
+version = "0.1.0"
+defaultTargets = ["Economy"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+version = "git#8f9d9cff6bd728b17a24e163c9402775d9e6a365"
+
+[[lean_lib]]
+name = "Economy"
