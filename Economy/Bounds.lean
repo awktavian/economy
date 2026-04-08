@@ -54,7 +54,7 @@ theorem litBox_upper (p : TFPParams) (h : LitBox p) : deltaTFP p ≤ 12 / 100 :=
     at least `(15/100)·(5/100)·(1 - f_max) = 75/10000 · (1 - f_max)`.
     When `f_max = 0` this specializes to the 0.75% literature floor. -/
 theorem litBox_envelope (p : TFPParams) (h : LitBox p)
-    (f_max : ℝ) (hf_le : p.friction ≤ f_max) (hf_nn : 0 ≤ f_max) (hf_lt : f_max < 1) :
+    (f_max : ℝ) (hf_le : p.friction ≤ f_max) (hf_lt : f_max < 1) :
     (75 / 10000) * (1 - f_max) ≤ deltaTFP p := by
   unfold deltaTFP
   have hx_lo := h.exp_lo

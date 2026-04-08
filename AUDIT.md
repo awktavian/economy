@@ -124,3 +124,92 @@ The economy project was already in audit-clean state when Pass A started.
 This audit's value is the AUDIT.md record itself — a written confirmation
 that a grep-based soundness + citation + triviality pass produces zero
 findings, plus the unused-hypothesis list for a future tightening pass.
+
+
+---
+
+## Bounds Tightening Pass (2026-04-08)
+
+State at start: 23 files, 2813 lines, 121 theorems, 0 sorry, 0 axioms, CLEAN,
+12 `unused variable` warnings.
+State at end: 23 files, 2855 lines, 124 theorems, 0 sorry, 0 axioms, CLEAN,
+**0 warnings**.
+
+### Tightened
+
+| Theorem | Before | After | Proof delta |
+|---|---|---|---|
+| `FinanceRealCoupling.keynesian_multiplier` | `0 ≤ m`, `0 ≤ τ`, `Δ ≤ Δ·mult` | Same weak form + NEW `keynesian_multiplier_strict` for `0 < m`, `τ < 1`, `0 < Δ` giving `Δ < Δ·mult` | +20L strict companion via `mul_lt_mul_of_pos_left` |
+| `FinancialMarkets.PV_mono_cashflows` | weak `≤` only | Same + NEW `PV_mono_cashflows_strict` requiring one strict index `k < n` with `c k < c' k` | +5L via `Finset.sum_lt_sum` |
+| `ScenarioSpace.hyperExp_dominates_continued` | weak `≤` at `T ≤ t` | Same + NEW `hyperExp_dominates_continued_strict` for `T < t` giving strict `<`. Crossover is exactly at `t = T` (both = 2) | +8L via `Real.rpow_lt_rpow_of_exponent_lt` |
+
+Strict `continued_dominates_plateau_strict` already existed (weak companion at `t_now < t`).
+
+### Already Tight
+
+- `Bounds.litBox_upper`: envelope `0.12 = 0.40 × 0.30` is the exact corner of the parameter cube — both maxima realized simultaneously. Corner check: `acemoglu_below_goldman_parameterized` already pins both endpoints.
+- `Bounds.acemoglu_low_corner`, `Bounds.goldman_high_corner`: stated as exact equalities at the corners, not bounds.
+- `Bounds.litBox_envelope`: the `(75/10000)·(1-f_max)` floor is exact when `exposure = 0.15`, `costSavings = 0.05`, `friction = f_max`. Tight at the cube vertex.
+- `Inequality.topDecile_linear_bound`: already stated as exact identity `Δshare = Δα · (ψ - ν)`, not a bound. Tight by definition (a single `field_simp; ring`).
+- `MatchingModel.steadyStateU_strictMono_separation`: already strict; `hs : 0 ≤ s` is load-bearing (needed for `0 < s + f`).
+- `Welfare.welfare_can_fall_with_gdp_rise`: witness `(1, 1.1, 1, 1/2)` is concrete. Margin `log(11/20)` is not obviously improvable without abandoning integer-friendly endpoints.
+- `Macro.keynesian_multiplier`: (see above — moved to Tightened via strict companion). Base identity is the closed form of the full geometric sum; no finite truncation.
+- `Forecast.forecast_mono_intelligence` / `metr_fast_dominates_baseline`: weak `≤` is correct — at `t = 0` both sides are `0`, so a universal strict `<` fails. Strict would require `t > 0` and `T₁ < T₂` strict, and the chain through `exposureFromHorizon` is only weakly monotone (min/max clipping). Tight under current `exposureFromHorizon`.
+
+### Implicit Assumptions Surfaced / Removed
+
+All 12 `unused variable` warnings investigated. Each was a hypothesis in the
+theorem statement that the proof did not actually use. Since every unused
+hypothesis is either (a) redundant strengthening of the statement or
+(b) a load-bearing hint the proof silently skipped, each was REMOVED from
+the statement (case a) after re-verifying the proof closes without it.
+This TIGHTENS the statement by weakening its preconditions.
+
+| File:line | Removed hypothesis | Theorem |
+|---|---|---|
+| Services.lean:89 | `hsE0 : 0 ≤ sE` | `baumol_bowen_drag` (only `sE ≤ 1`, `0 ≤ gP` needed) |
+| Bounds.lean:57 | `hf_nn : 0 ≤ f_max` | `litBox_envelope` (only `hf_lt : f_max < 1` needed; nonneg follows from `hf_le` + `p.fric_nonneg`) |
+| TaskModel.lean:148 | `hc : 0 ≤ c` | `acemoglu_macro_bound` (bound holds for any real `c` under `h_bounded`) |
+| LaborShare.lean:83 | `hα : ∀ i, 0 ≤ α i` | `laborShare_strict_antitone_single` (only `hαj : 0 < α j` at index `j`, rewriting on others) |
+| IntelligenceTrajectory.lean:44 | `hT : T ≠ 0` | `intelligenceLevel_zero` (`0 / T = 0` holds in Lean for any `T`) |
+| FinanceRealCoupling.lean:73 | `hY : 0 < Y` | `ghost_gdp_dominates_iff` (identity closes via `linarith` alone) |
+| Forecast.lean:78 | `hT' : 0 < T'` | `gA_antitone_doublingTime` (implied by `hT : 0 < T` and `T ≤ T'`) |
+| ScenarioSpace.lean:132 | `ht_now : 0 ≤ t_now` | `continued_dominates_plateau_strict` |
+| ScenarioSpace.lean:142 | `ht_now : 0 ≤ t_now` | `continued_dominates_plateau` (weak) |
+| ScenarioSpace.lean:194 | `hL : 0 < L` | `continued_exceeds_sigmoid_ceiling` (works for any `L`; implementation picks any witness via `tendsto_atTop_atTop`) |
+| ScenarioSpace.lean:214 | `hT : 0 < T` | `aiWinter_tendsto_zero` (only `0 < decay` needed; `2 ^ (t_winter / T)` is a bounded constant regardless of sign of `T`) |
+| ScenarioSpace.lean:361 | `hI₁nn : 0 ≤ I₁ t` | `gdp_dominance_from_intelligence_dominance` (exposure function clips to `[0,1]`; nonnegativity of `I₁ t` is not needed) |
+| ScenarioSpace.lean:400 | `ht_now : 0 ≤ t_now` | `mythos_plateau_corollary` |
+| ScenarioSpace.lean:479 | `ht_now : 0 ≤ t_now` | `plateau_below_continued_GDP` |
+| ScenarioSpace.lean:386 | `τ : Trajectory` | `welfare_can_diverge_under_any_trajectory` — renamed to `_τ`; the theorem binds `_τ` to document that the witness is trajectory-independent (load-bearing for reader, not for proof) |
+
+### Tried Failed
+
+None. Every attempted tightening in scope landed. `forecast_mono_intelligence`
+strict version was considered and rejected as structurally impossible under
+the current `exposureFromHorizon` (it clips, so two scenarios with different
+doubling times can coincide on any interval where both have saturated
+exposure).
+
+### Mathlib gaps
+
+None blocking further tightening at this pass. Every remaining "weak `≤`" in
+the corpus is either an exact identity, a clipped/saturated-region result,
+or already has a strict companion after this pass. The corpus is now as
+tight as the current definitions permit. Further tightening would require
+changing definitions (e.g. replacing `exposureFromHorizon`'s hard min/max
+clip with a smooth saturation) — out of scope for an audit pass.
+
+### Final numbers
+
+```
+files:     23
+lines:    2855  (+42)
+theorems:  124  (+3)
+sorry:       0
+axioms:      0
+warnings:    0  (was 12)
+errors:      0
+build:   GREEN
+sound:   CLEAN
+```

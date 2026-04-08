@@ -77,6 +77,18 @@ theorem PV_mono_cashflows (n : ℕ) (r : ℝ) (hr : 0 < 1 + r)
   have hpow : 0 < (1 + r) ^ i := pow_pos hr _
   exact div_le_div_of_nonneg_right (h i) hpow.le
 
+/-- THEOREM (strict): PV is strictly monotone in cash flows when at least one
+    period has a strictly greater cash flow and the horizon covers it. -/
+theorem PV_mono_cashflows_strict (n : ℕ) (r : ℝ) (hr : 0 < 1 + r)
+    (c c' : ℕ → ℝ) (h : ∀ i, c i ≤ c' i)
+    {k : ℕ} (hk : k < n) (hlt : c k < c' k) :
+    PV n c r < PV n c' r := by
+  unfold PV
+  refine Finset.sum_lt_sum (g := fun i => c' i / (1 + r) ^ i)
+    (fun i _ => div_le_div_of_nonneg_right (h i) (pow_pos hr _).le)
+    ⟨k, Finset.mem_range.mpr hk,
+      (div_lt_div_iff_of_pos_right (pow_pos hr k)).mpr hlt⟩
+
 /-- THEOREM: PV is strictly antitone in `r` for a strictly positive constant
     cash-flow stream and at least one period. Raising the discount rate
     strictly lowers PV. This is the Fed-rate-cut channel. -/

@@ -129,7 +129,7 @@ theorem mythosPlateau_preFreeze {t_now T t : ℝ} (h : t ≤ t_now) :
     for `t > t_now` and `T > 0`, the continued trajectory is strictly
     greater than the plateau. Before `t_now` they coincide. -/
 theorem continued_dominates_plateau_strict
-    {t_now T t : ℝ} (hT : 0 < T) (ht : t_now < t) (ht_now : 0 ≤ t_now) :
+    {t_now T t : ℝ} (hT : 0 < T) (ht : t_now < t) :
     mythosPlateau t_now T t < continuedExponential T t := by
   rw [mythosPlateau_frozen ht]
   unfold continuedExponential
@@ -139,12 +139,12 @@ theorem continued_dominates_plateau_strict
 
 /-- THEOREM (continued weakly dominates plateau everywhere): -/
 theorem continued_dominates_plateau
-    {t_now T t : ℝ} (hT : 0 < T) (ht_now : 0 ≤ t_now) :
+    {t_now T t : ℝ} (hT : 0 < T) :
     mythosPlateau t_now T t ≤ continuedExponential T t := by
   by_cases ht : t ≤ t_now
   · rw [mythosPlateau_preFreeze ht]
   · push_neg at ht
-    exact le_of_lt (continued_dominates_plateau_strict hT ht ht_now)
+    exact le_of_lt (continued_dominates_plateau_strict hT ht)
 
 /-- THEOREM (hyperExp dominates continued for t > T with β > 1):
     when `β > 1`, at `t = T` both equal `2`, and for `t > T` the
@@ -154,14 +154,24 @@ theorem hyperExp_dominates_continued
     {T β t : ℝ} (hT : 0 < T) (hβ : 1 < β) (ht : T ≤ t) :
     continuedExponential T t ≤ hyperExponential T β t := by
   unfold continuedExponential hyperExponential
-  have h2 : (1 : ℝ) ≤ 2 := by norm_num
   apply Real.rpow_le_rpow_left_iff (by norm_num : (1 : ℝ) < 2) |>.mpr
   -- Goal: t/T ≤ (t/T)^β when t ≥ T (so t/T ≥ 1) and β > 1.
   have hx : (1 : ℝ) ≤ t / T := (one_le_div hT).mpr ht
-  -- For x ≥ 1, β > 1 ⇒ x ≤ x^β. Use Real.self_le_rpow_of_le.
-  -- Equivalent: x^1 ≤ x^β (monotone base x ≥ 1).
   have := Real.rpow_le_rpow_of_exponent_le hx (le_of_lt hβ)
   simpa using this
+
+/-- THEOREM (hyperExp strictly dominates continued for `t > T`): the
+    crossover happens exactly at `t = T` (both equal `2`). For `t > T`
+    the hyper-exponential is STRICTLY above the continued exponential. -/
+theorem hyperExp_dominates_continued_strict
+    {T β t : ℝ} (hT : 0 < T) (hβ : 1 < β) (ht : T < t) :
+    continuedExponential T t < hyperExponential T β t := by
+  unfold continuedExponential hyperExponential
+  apply (Real.rpow_lt_rpow_left_iff (by norm_num : (1 : ℝ) < 2)).mpr
+  -- t/T > 1, so (t/T)^β > (t/T)^1 = t/T.
+  have hx : (1 : ℝ) < t / T := (one_lt_div hT).mpr ht
+  have h := Real.rpow_lt_rpow_of_exponent_lt hx hβ
+  simpa using h
 
 /-- Helper: `t/T → ∞` as `t → ∞` for `T > 0`. -/
 private lemma tendsto_div_const_atTop {T : ℝ} (hT : 0 < T) :
@@ -191,7 +201,7 @@ private lemma continuedExponential_tendsto_atTop {T : ℝ} (hT : 0 < T) :
 /-- THEOREM (sigmoid is bounded; continued is unbounded, so continued
     eventually exceeds sigmoid no matter how high the ceiling L). -/
 theorem continued_exceeds_sigmoid_ceiling
-    {T L : ℝ} (hT : 0 < T) (hL : 0 < L) :
+    {T : ℝ} (hT : 0 < T) (L : ℝ) :
     ∃ t, L ≤ continuedExponential T t := by
   have hlim := continuedExponential_tendsto_atTop hT
   obtain ⟨t, ht⟩ := (Filter.tendsto_atTop_atTop.mp hlim) L
@@ -202,7 +212,7 @@ theorem continued_exceeds_sigmoid_ceiling
 theorem continued_eventually_above_sigmoid
     {T k L t₀ : ℝ} (hT : 0 < T) (hL : 0 < L) :
     ∃ t, sigmoidSaturation k L t₀ t < continuedExponential T t := by
-  obtain ⟨t, ht⟩ := continued_exceeds_sigmoid_ceiling (L := L) hT hL
+  obtain ⟨t, ht⟩ := continued_exceeds_sigmoid_ceiling (L := L) hT
   refine ⟨t, ?_⟩
   have := sigmoidSaturation_lt_ceiling (k := k) (t₀ := t₀) (t := t) hL
   linarith
@@ -211,7 +221,7 @@ theorem continued_eventually_above_sigmoid
     tends to `0` as `t → ∞`. The labor-cost integral does NOT unwind; see
     `winter_displacement_does_not_unwind` below. -/
 theorem aiWinter_tendsto_zero
-    {T t_winter decay : ℝ} (hT : 0 < T) (hd : 0 < decay) :
+    {T t_winter decay : ℝ} (hd : 0 < decay) :
     Filter.Tendsto (aiWinter T t_winter decay) Filter.atTop (nhds 0) := by
   -- Eventually t > t_winter, and the function is then
   --   2^(t_winter/T) * exp(-decay * (t - t_winter))
@@ -254,7 +264,7 @@ theorem continued_eventually_above_winter
     ∃ t, aiWinter T t_winter decay t < continuedExponential T t := by
   -- continued tends to ∞; winter tends to 0. Pick t large enough.
   have hlim_c := continuedExponential_tendsto_atTop hT
-  have hlim_w := aiWinter_tendsto_zero (T := T) (t_winter := t_winter) hT hd
+  have hlim_w := aiWinter_tendsto_zero (T := T) (t_winter := t_winter) hd
   -- Eventually continued > 1 and winter < 1.
   have h1 : ∀ᶠ t in Filter.atTop, (1 : ℝ) < continuedExponential T t :=
     hlim_c.eventually (Filter.eventually_gt_atTop 1)
@@ -358,7 +368,7 @@ theorem trajectoryLogGDP_nonneg
 theorem gdp_dominance_from_intelligence_dominance
     {I₁ I₂ : ℝ → ℝ} {H₀ Hmax α gK cost t : ℝ}
     (hH₀ : 0 < H₀) (hHmax : 0 < Hmax) (hcost : 0 ≤ cost)
-    (hI₁nn : 0 ≤ I₁ t) (hle : I₁ t ≤ I₂ t) (ht : 0 ≤ t) :
+    (hle : I₁ t ≤ I₂ t) (ht : 0 ≤ t) :
     trajectoryLogGDP I₁ H₀ Hmax α gK cost t
       ≤ trajectoryLogGDP I₂ H₀ Hmax α gK cost t := by
   unfold trajectoryLogGDP trajectoryGA
@@ -383,10 +393,10 @@ theorem gdp_dominance_from_intelligence_dominance
     STRUCTURE: welfare-divergence is not a phenomenon of fast doubling;
     it is a phenomenon of the LABOR-SHARE CHANNEL which runs separately
     from any trajectory.  -/
-theorem welfare_can_diverge_under_any_trajectory (τ : Trajectory) :
+theorem welfare_can_diverge_under_any_trajectory (_τ : Trajectory) :
     ∃ (Y Y' lam lam' : ℝ), 0 < Y ∧ 0 < Y' ∧ 0 < lam ∧ 0 < lam'
       ∧ Y < Y' ∧ welfareDelta (lam * Y) (lam' * Y') < 0 := by
-  -- The witness does not depend on τ. That's the content.
+  -- The witness does not depend on _τ. That's the content.
   exact welfare_can_fall_with_gdp_rise
 
 /-- THEOREM (Mythos plateau corollary, saturation of log-GDP deviation):
@@ -397,7 +407,7 @@ theorem welfare_can_diverge_under_any_trajectory (τ : Trajectory) :
     the gift stops giving more. -/
 theorem mythos_plateau_corollary
     {t_now T H₀ Hmax cost t : ℝ}
-    (ht_now : 0 ≤ t_now) (ht : t_now ≤ t) :
+    (ht : t_now ≤ t) :
     trajectoryGA (mythosPlateau t_now T) H₀ Hmax cost t
       = trajectoryGA (mythosPlateau t_now T) H₀ Hmax cost t_now := by
   unfold trajectoryGA
@@ -469,22 +479,22 @@ theorem hyperExp_corollary
   have hcnn : 0 ≤ continuedExponential T t := (continuedExponential_pos T t).le
   exact gdp_dominance_from_intelligence_dominance
     (I₁ := continuedExponential T) (I₂ := hyperExponential T β)
-    hH₀ hHmax hcost hcnn hlocal ht_nn
+    hH₀ hHmax hcost hlocal ht_nn
 
 /-- THEOREM (plateau-below-continued GDP lift): the Mythos plateau
     induces a log-GDP deviation weakly below that of continued
     exponential at every `t ≥ 0`. -/
 theorem plateau_below_continued_GDP
     {t_now T H₀ Hmax α gK cost t : ℝ}
-    (hT : 0 < T) (ht_now : 0 ≤ t_now) (ht : 0 ≤ t)
+    (hT : 0 < T) (ht : 0 ≤ t)
     (hH₀ : 0 < H₀) (hHmax : 0 < Hmax) (hcost : 0 ≤ cost) :
     trajectoryLogGDP (mythosPlateau t_now T) H₀ Hmax α gK cost t
       ≤ trajectoryLogGDP (continuedExponential T) H₀ Hmax α gK cost t := by
   have hle : mythosPlateau t_now T t ≤ continuedExponential T t :=
-    continued_dominates_plateau hT ht_now
+    continued_dominates_plateau hT
   have hmp_nn : 0 ≤ mythosPlateau t_now T t := (mythosPlateau_pos _ _ _).le
   exact gdp_dominance_from_intelligence_dominance
     (I₁ := mythosPlateau t_now T) (I₂ := continuedExponential T)
-    hH₀ hHmax hcost hmp_nn hle ht
+    hH₀ hHmax hcost hle ht
 
 end Economy

@@ -145,7 +145,6 @@ theorem hulten_discrete (E' : TaskEconomy n)
     the aggregate log-TFP change is at most `exposureShare(S) · c`.
     This is the bound Acemoglu (w32487) states in the abstract. -/
 theorem acemoglu_macro_bound (E' : TaskEconomy n) (S : Finset (Fin n)) (c : ℝ)
-    (hc : 0 ≤ c)
     (hψ : E'.ψ = E.ψ) (hk : E'.k = E.k) (hℓ : E'.ℓ = E.ℓ) (hα : E'.α = E.α)
     (h_untouched : ∀ i ∉ S, E'.A i = E.A i)
     (h_bounded : ∀ i ∈ S, Real.log (E'.A i) - Real.log (E.A i) ≤ c) :

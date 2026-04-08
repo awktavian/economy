@@ -41,7 +41,7 @@ theorem intelligenceLevel_pos (t T : ℝ) : 0 < intelligenceLevel t T := by
   exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
 
 /-- THEOREM: intelligenceLevel at t=0 is exactly 1 (normalization). -/
-theorem intelligenceLevel_zero (T : ℝ) (hT : T ≠ 0) :
+theorem intelligenceLevel_zero (T : ℝ) :
     intelligenceLevel 0 T = 1 := by
   unfold intelligenceLevel
   rw [zero_div]

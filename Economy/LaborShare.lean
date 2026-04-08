@@ -80,7 +80,7 @@ theorem laborShare_antitone {n : ℕ} {α ψ ψ' : Fin n → ℝ}
     the labor share strictly falls when task j is automated harder. -/
 theorem laborShare_strict_antitone_single {n : ℕ} {α ψ ψ' : Fin n → ℝ}
     (j : Fin n)
-    (hα : ∀ i, 0 ≤ α i) (hαj : 0 < α j)
+    (hαj : 0 < α j)
     (h_eq : ∀ i ≠ j, ψ i = ψ' i) (h_lt : ψ j < ψ' j) :
     laborShare α ψ' < laborShare α ψ := by
   unfold laborShare

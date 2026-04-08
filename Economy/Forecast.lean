@@ -75,7 +75,7 @@ theorem gA_mono (s : Scenario) {t t' : ℝ} (h : t ≤ t') : s.gA t ≤ s.gA t' 
     (smaller T) means higher intelligence at every t > 0, hence weakly higher
     exposure and gA. -/
 theorem gA_antitone_doublingTime {T T' H₀ Hmax cost : ℝ}
-    (hT : 0 < T) (hT' : 0 < T') (hTle : T ≤ T')
+    (hT : 0 < T) (hTle : T ≤ T')
     (hH₀ : 0 < H₀) (hHmax : 0 < Hmax) (hcost : 0 ≤ cost) {t : ℝ} (ht : 0 ≤ t) :
     exposureFromHorizon (taskHorizon (intelligenceLevel t T') H₀) Hmax * cost
       ≤ exposureFromHorizon (taskHorizon (intelligenceLevel t T) H₀) Hmax * cost := by
@@ -100,7 +100,7 @@ theorem forecast_mono_intelligence
   have hgA : s2.gA t ≤ s1.gA t := by
     unfold gA
     rw [hH₀, hHmax, hcost]
-    apply gA_antitone_doublingTime s1.T_pos s2.T_pos hT s2.H₀_pos s2.Hmax_pos s2.cost_nn ht
+    apply gA_antitone_doublingTime s1.T_pos hT s2.H₀_pos s2.Hmax_pos s2.cost_nn ht
   rw [hα, hgK]
   have hsum : s2.gA t + (1 - s2.α) * s2.gK ≤ s1.gA t + (1 - s2.α) * s2.gK := by
     linarith

@@ -86,8 +86,7 @@ def aggregateGrowth (sE gP : ℝ) : ℝ := sE * gP
     Equivalently: `aggregateGrowth ≤ gP`, with equality iff the stagnant share
     is zero. This is the "drag" — the economy's growth rate is pulled DOWN
     toward the stagnant sector's growth rate (zero). -/
-theorem baumol_bowen_drag {sE gP : ℝ} (hsE0 : 0 ≤ sE) (hsE1 : sE ≤ 1)
-    (hgP : 0 ≤ gP) :
+theorem baumol_bowen_drag {sE gP : ℝ} (hsE1 : sE ≤ 1) (hgP : 0 ≤ gP) :
     aggregateGrowth sE gP ≤ gP := by
   unfold aggregateGrowth
   nlinarith
