@@ -40,3 +40,17 @@ All empirical parameters in the Lean formalization come from the five sources be
 - **IMF (Jan 2024), "Gen-AI and the Future of Work"**: ~40% global employment exposure; ~60% in advanced economies.
 
 These are cited as the HIGH end of the sensitivity envelope in `Economy/Bounds.lean`. They are NOT treated as point estimates; the Acemoglu 0.66% figure is the conservative anchor.
+
+## 6. Theoretical sources for the hardened theory (added 2026-04-08)
+
+- **Zeira (1998)**, "Workers, Machines, and Economic Growth", QJE 113(4): 1091–1117. https://doi.org/10.1162/003355398555847 — task-based production primitive.
+- **Acemoglu & Restrepo (2018)**, "The Race between Man and Machine: Implications of Technology for Growth, Factor Shares, and Employment", AER 108(6): 1488–1542. https://doi.org/10.1257/aer.20160696 — displacement/reinstatement decomposition.
+- **Acemoglu & Restrepo (2022)**, "Tasks, Automation, and the Rise in U.S. Wage Inequality", Econometrica 90(5): 1973–2016. https://doi.org/10.3982/ECTA19815 — CES σ<1 vs σ>1 displacement-vs-productivity sign.
+- **Hulten (1978)**, "Growth Accounting with Intermediate Inputs", Review of Economic Studies 45(3): 511–518 — the discrete log-decomposition theorem used here.
+- **Arrow, Chenery, Minhas, Solow (1961)**, "Capital-Labor Substitution and Economic Efficiency", Rev. Econ. Stat. 43(3): 225–250 — CES and its Cobb-Douglas limit.
+- **Mortensen & Pissarides (1994)**, "Job Creation and Job Destruction in the Theory of Unemployment", RES 61(3): 397–415. https://doi.org/10.2307/2297896 — matching function and steady-state unemployment.
+- **Petrongolo & Pissarides (2001)**, "Looking into the Black Box: A Survey of the Matching Function", JEL 39(2): 390–431.
+- **Baumol (1967)**, "Macroeconomics of Unbalanced Growth", AER 57(3): 415–426 — cost disease.
+- **Baumol & Bowen (1966)**, "Performing Arts: The Economic Dilemma" — growth drag.
+- **Ngai & Pissarides (2007)**, "Structural Change in a Multisector Model of Growth", AER 97(1): 429–443. https://doi.org/10.1257/aer.97.1.429 — two-sector structural change.
+- **Karabarbounis & Neiman (2014)**, "The Global Decline of the Labor Share", QJE 129(1): 61–103. https://doi.org/10.1093/qje/qjt032 — labor share dynamics.
