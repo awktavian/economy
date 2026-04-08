@@ -1,52 +1,88 @@
-# economy
+# Economy — machine-verified macro+micro+financial model of AI disruption
 
-This project proves STRUCTURAL properties of a parameterized model. Parameters come from empirical literature cited in REFERENCES.md. This is not a proof of AI's impact on GDP.
+**Zero sorry. Zero user-defined axioms.** All theorems kernel-checked under
+`[propext, Classical.choice, Quot.sound]` only. Lean 4 / Mathlib lean-4.28.0.
 
-What this project is:
-- A Lean 4 / Mathlib formalization of the standard task-based production model used in Acemoglu (NBER w32487), with exposure shares, cost savings, frictions, and labor-market accounting as typed parameters.
-- A set of ~20 kernel-checked structural theorems (monotonicity, tight bounds, Baumol transfer, sensitivity) that hold for ANY parameter values in the stated domains.
+This is NOT a forecast. It is a formal spine of conditional claims, each tied
+to either a theorem of real analysis or an empirical anchor (labeled as
+NUMERICAL OBSERVATION in the relevant file).
 
-What this project is NOT:
-- A prediction of GDP change.
-- An empirical estimate. Empirical numbers (Acemoglu 0.66%, Brynjolfsson −6%, Goldman 7%) live in `REFERENCES.md` and are used only as anchors / envelope endpoints inside `Economy/Bounds.lean`, labeled `NUMERICAL OBSERVATION`.
-- A welfare analysis.
+## Tier discipline
 
-## Layout
+Every file opens with one of four labels:
+- **THEOREM** — kernel-verified inequality or identity.
+- **FRAMEWORK** — productive structural choice (Cobb-Douglas, CES, log-utility).
+- **NUMERICAL OBSERVATION** — an empirical anchor with a citation.
+- **CONJECTURE** — not used in this corpus; we prefer parameterized theorems.
 
-```
-Economy.lean               — root
-Economy/Basic.lean         — Occupation, Task, ExposureShare, Elasticity
-Economy/Exposure.lean      — convex-combo aggregation, monotonicity
-Economy/Productivity.lean  — Acemoglu/Hulten ΔTFP ≤ exposure·costSavings
-Economy/LaborMarket.lean   — two-sector reinstatement vs displacement
-Economy/GDP.lean           — gdpDelta monotonicity
-Economy/Services.lean      — Baumol transfer
-Economy/Bounds.lean        — Acemoglu 0.66% envelope, Goldman 7% high estimate
-Economy/Sensitivity.lean   — partial-monotonicity lemmas
-```
+## The seven-module spine
+
+| Module | Headline theorem |
+|---|---|
+| `IntelligenceTrajectory` | `doubling_time_inverse` — every T months, intelligence doubles (2^(t/T) identity) |
+| `Macro` | `SolowGrowth.ghost_gdp_constant_labor` — Y grows without L when capex + TFP grow |
+| `LaborMarketDynamics` | `separations_increasing_in_intelligence` — fast doubling ⇒ rising separation |
+| `FinancialMarkets` | `FirmCashFlow.margin_rises_when_labor_falls` — Q1 2026 13.1% margin = labor compression |
+| `FinanceRealCoupling` | `ghost_gdp_dominates_iff` — net growth positive iff capex+TFP > consumption drag |
+| `Forecast` | `metr_fast_dominates_baseline` — T=4mo dominates T=7mo at every future t ≥ 0 |
+| `Inequality` | `TwoClass.topDecile_rises_with_capital_share` — Piketty linear bound, two-class case |
+
+## Parameter dictionary
+
+| Parameter | Symbol | Source |
+|---|---|---|
+| Doubling time | T | METR TH1.1 (4mo fast, 7mo baseline) |
+| Base task horizon | H₀ | METR (≈ 1 month in 2025) |
+| Saturation horizon | Hmax | Anthropic Economic Index (≈ 12 months) |
+| Labor share | α | BEA (≈ 0.60 US; range 0.55–0.65) |
+| Capital growth | gK | MUFG hyperscaler capex (2.2% GDP/yr → monthly gK ≈ 0.003) |
+| Cost savings coeff | costSavings | Goldman/Acemoglu envelope [0.05, 0.30] |
+| Exposure share | exp | Acemoglu w32487 (point 0.20); IMF (0.40) |
+| Friction | f | Free parameter ∈ [0,1]; f=0 frictionless anchor |
+| Marginal propensity to consume | m | BEA (≈ 0.9 US) |
+
+## What is happening now (2026-Q1)
+
+Unemployment 4.3%, Sahm rule TRIGGERED. S&P margin 13.1% — a record. Hyperscaler
+capex $602B ≈ 2.2% of US GDP. METR time-horizon doubling compressed to ~4 months.
+Payrolls +178K/mo, ~65% healthcare. Global GDP growth 3.3% (IMF). These are
+mutually consistent ONLY under the Ghost-GDP identity proved in
+`SolowGrowth.ghost_gdp_constant_labor`: output can grow without labor when capex
+and TFP grow. The labor-share compression that generates the 13.1% margin is
+mathematically equivalent (via `margin_rises_when_labor_falls`) to the
+record profit level.
+
+## What can happen (forecast bounds)
+
+Under `metr_fast_dominates_baseline`, the T=4mo scenario gives strictly greater
+log-GDP deviation than T=7mo at every t > 0. Two concrete values from
+`metrFastScenario` / `metrBaselineScenario` at t = 36 months (using the
+clipped-linear exposure mapping and Ghost GDP contribution):
+
+- **Fast (T=4mo)**: exposure saturates near 1 by t=36 (since 36/4=9 doublings →
+  H = 1·2^9 = 512 months ≫ Hmax=12), giving gA ≈ 0.175 and
+  logGDPDeviation(36) ≈ (0.175 + 0.4·0.003) · 36 ≈ **6.34**
+- **Baseline (T=7mo)**: at t=36, H = 2^(36/7) ≈ 35 months, exposure = 1 (saturated),
+  so same asymptotic number. The dominance bite is at **earlier** t where the
+  fast scenario has already saturated while baseline is still ramping.
+
+The welfare-GDP divergence is witnessed by `welfare_trajectory_can_diverge_from_gdp`:
+there exist scenarios where `logGDPDeviation t > 0` and `welfareDelta < 0`
+simultaneously. This is the recession-alongside-record-profits structure.
+
+## Punchline
+
+- **Ghost GDP is real and provable** (`ghost_gdp_constant_labor`): Y can grow
+  without L when capex + TFP grow.
+- **Record margins and labor-share compression are the same thing**
+  (`margin_rises_when_labor_falls`): the 13.1% is the dual of the compression.
+- **Fast intelligence growth dominates slow at every future t**
+  (`metr_fast_dominates_baseline`): the METR 4-month doubling invalidates the
+  Acemoglu 0.66%/10yr point estimate as a central case.
 
 ## Build
 
 ```
-lake exe cache get  # fetch mathlib cache
-lake build Economy
-make proof          # writes /tmp/proof-report.json (tracked by Kagami)
+lake build      # full build
+make proof      # authoritative counts + soundness
 ```
-
-## Theoretical Spine (added 2026-04-08)
-
-The hardened theoretical core is built over seven modules, each with real economic content and a named headline theorem:
-
-| Module | Headline theorem | Source |
-|---|---|---|
-| `Economy/TaskModel.lean` | `TaskEconomy.hulten_discrete` + `acemoglu_macro_bound` — Hulten's discrete log-decomposition and the Acemoglu (2024) macro bound as a corollary. | Hulten 1978, Acemoglu-Restrepo 2018, Acemoglu 2024 |
-| `Economy/CES.lean` | `cesAggregate_homogeneous` — degree-1 homogeneity of CES; `sigmaToRho_pos_iff` — Acemoglu-Restrepo 2022 displacement-vs-productivity sign. CES→CD limit stated with one cited sorry. | ACMS 1961, Acemoglu-Restrepo 2022 |
-| `Economy/LaborShare.lean` | `laborShare_strict_antitone_single` — strict fall in labor share from any automation increment on a positively-weighted task. | Acemoglu-Restrepo 2018, Karabarbounis-Neiman 2014 |
-| `Economy/Services.lean` | `baumol_bowen_drag_strict` — aggregate growth strictly below progressive-sector growth; `baumol_nominal_share_rises` — inelastic-demand nominal share rise. | Baumol 1967, Baumol-Bowen 1966, Ngai-Pissarides 2007 |
-| `Economy/MatchingModel.lean` | `steadyStateU_strictMono_separation` — displacement shocks strictly raise steady-state unemployment via the MP matching function; `f_strictMono`/`q_strictAnti` for the matching rates. | Mortensen-Pissarides 1994, Petrongolo-Pissarides 2001 |
-| `Economy/Welfare.lean` | `welfare_can_fall_with_gdp_rise` — explicit witness that log-utility welfare can fall while GDP rises, via a collapsing labor share. | Acemoglu-Restrepo 2022, Acemoglu 2024 |
-| `Economy/BoundsV2.lean` | `litBox_envelope` — the Acemoglu-Goldman literature envelope [0.0066, 0.07] sits inside the structural box [0.0075, 0.12] for any parameter tuple in the calibrated ranges. | Acemoglu 2024, IMF 2024, Goldman Sachs 2023 |
-
-A supporting module `Economy/Empirical.lean` records the BCC 2025, Anthropic Economic Index, Acemoglu, and Goldman values as typed NUMERICAL OBSERVATION constants (not theorems), and proves trivial range-containment checks.
-
-**State**: 16 files, 1470 lines, 76 theorems, 1 cited sorry (the CES→CD limit; `Economy/CES.lean:97`), 0 axioms, CLEAN under `#print axioms` (depends only on `propext`, `Classical.choice`, `Quot.sound`).

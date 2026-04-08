@@ -54,3 +54,21 @@ These are cited as the HIGH end of the sensitivity envelope in `Economy/Bounds.l
 - **Baumol & Bowen (1966)**, "Performing Arts: The Economic Dilemma" — growth drag.
 - **Ngai & Pissarides (2007)**, "Structural Change in a Multisector Model of Growth", AER 97(1): 429–443. https://doi.org/10.1257/aer.97.1.429 — two-sector structural change.
 - **Karabarbounis & Neiman (2014)**, "The Global Decline of the Labor Share", QJE 129(1): 61–103. https://doi.org/10.1093/qje/qjt032 — labor share dynamics.
+
+## 2026-04-08 empirical anchors (appended)
+
+| Datum | Value | Source |
+|---|---|---|
+| US unemployment rate (Mar 2026) | 4.3% (7.2M unemployed) | BLS Employment Situation, March 2026 — https://www.bls.gov/news.release/empsit.nr0.htm |
+| US labor-force participation | 61.9% | BLS, March 2026 |
+| US nonfarm payroll growth | +178K/mo (Mar 2026); 2025 avg +181K/mo | BLS |
+| Sector share of 2025 job growth | ~65% healthcare | BLS |
+| Sahm Rule status | TRIGGERED (2026) | Fortune/FRED |
+| Global GDP growth 2026 | IMF 3.3% / World Bank 2.6% | IMF WEO Jan 2026; WB GEP Jan 2026 |
+| Hyperscaler capex 2026 | ~$602B (+36% YoY), ~75% ($450B) AI infra | MUFG / CreditSights / Introl |
+| Hyperscaler capex / US GDP | ~2.2% | MUFG |
+| S&P 500 net profit margin (Q1 2026) | 13.1%, record | FactSet |
+| S&P 500 forecast margin FY2026 | 13.9%, record | FactSet |
+| METR AI time-horizon doubling (2024-25) | ~4 months | METR TH1.1 — https://metr.org/blog/2026-1-29-time-horizon-1-1/ |
+| METR baseline doubling (2019-25) | ~7 months | METR |
+| Anthropic Mythos SWE-bench Verified | 93.9% (2026-04-07) | Claude Mythos System Card |
