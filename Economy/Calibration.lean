@@ -66,6 +66,10 @@ structure ModelCalibration where
   ψ_k       : {x : ℝ // 0 < x ∧ x < 1}
   /-- METR log-linear regression slope in nats/month (≈ 0.173 fast, 0.099 baseline). -/
   β_slope   : {x : ℝ // 0 < x}
+  /-- Capital-growth rate per month (hyperscaler capex run-rate / GDP, ≈ 0.003/mo). -/
+  gK        : {x : ℝ // 0 ≤ x}
+  /-- Cost-savings coefficient (ΔA per unit exposure, Acemoglu midpoint 0.175). -/
+  costSavings : {x : ℝ // 0 < x ∧ x < 1}
   /-- Ordering constraint: base horizon strictly below saturation horizon. -/
   H_min_lt_H_max : H_min.val < H_max.val
 
@@ -93,6 +97,8 @@ def calBEA2026 : ModelCalibration where
   β_slope := ⟨metrFastSlope, by
     unfold metrFastSlope
     exact div_pos (Real.log_pos (by norm_num)) (by norm_num)⟩
+  gK := ⟨3 / 1000, by norm_num⟩
+  costSavings := ⟨175 / 1000, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Baseline calibration (METR 2019–25 slope). Same BEA parameters but with
@@ -106,6 +112,8 @@ def calBaseline : ModelCalibration where
   β_slope := ⟨metrBaselineSlope, by
     unfold metrBaselineSlope
     exact div_pos (Real.log_pos (by norm_num)) (by norm_num)⟩
+  gK := ⟨3 / 1000, by norm_num⟩
+  costSavings := ⟨175 / 1000, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Pessimistic (highest-plausible displacement) calibration: lower labor
@@ -120,6 +128,8 @@ def calPessimistic : ModelCalibration where
   β_slope := ⟨metrFastSlope, by
     unfold metrFastSlope
     exact div_pos (Real.log_pos (by norm_num)) (by norm_num)⟩
+  gK := ⟨3 / 1000, by norm_num⟩
+  costSavings := ⟨250 / 1000, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-! ### Part 2 — Validation theorems V1–V6
@@ -403,6 +413,27 @@ theorem welfare_consistency (_c : ModelCalibration) :
     ∃ (Y Y' lam lam' : ℝ), 0 < Y ∧ 0 < Y' ∧ 0 < lam ∧ 0 < lam'
       ∧ Y < Y' ∧ welfareDelta (lam * Y) (lam' * Y') < 0 :=
   welfare_can_fall_with_gdp_rise
+
+
+/-! ### Part 6 — Scenario ↔ Calibration bridge -/
+
+/-- Wire a `ModelCalibration` into a forward-time `Scenario` for the end-to-end
+    forecast. Doubling time is derived from the METR regression slope; all six
+    other parameters pass through directly. -/
+noncomputable def Scenario.fromCalibration (c : ModelCalibration) : Scenario where
+  T := c.doublingTime
+  H₀ := c.H_min.val
+  Hmax := c.H_max.val
+  α := c.α.val
+  gK := c.gK.val
+  costSavings := c.costSavings.val
+  T_pos := c.doublingTime_pos
+  H₀_pos := c.H_min.property
+  Hmax_pos := c.H_max.property
+  α_pos := c.α.property.1
+  α_lt_one := c.α.property.2
+  gK_nn := c.gK.property
+  cost_nn := le_of_lt c.costSavings.property.1
 
 end
 
