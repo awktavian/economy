@@ -70,6 +70,10 @@ structure ModelCalibration where
   gK        : {x : ℝ // 0 ≤ x}
   /-- Cost-savings coefficient (ΔA per unit exposure, Acemoglu midpoint 0.175). -/
   costSavings : {x : ℝ // 0 < x ∧ x < 1}
+  /-- Non-substitutable labor share (childcare + nursing + skilled trades + personal-care
+      ≈ 25% of US payroll, BLS OES 2026). The two-bucket Cobb-Douglas floor in
+      `Economy.JobSwapping`. -/
+  nonSubShare : {x : ℝ // 0 < x ∧ x < 1}
   /-- Ordering constraint: base horizon strictly below saturation horizon. -/
   H_min_lt_H_max : H_min.val < H_max.val
 
@@ -99,6 +103,7 @@ def calBEA2026 : ModelCalibration where
     exact div_pos (Real.log_pos (by norm_num)) (by norm_num)⟩
   gK := ⟨3 / 1000, by norm_num⟩
   costSavings := ⟨175 / 1000, by constructor <;> norm_num⟩
+  nonSubShare := ⟨25 / 100, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Baseline calibration (METR 2019–25 slope). Same BEA parameters but with
@@ -114,6 +119,7 @@ def calBaseline : ModelCalibration where
     exact div_pos (Real.log_pos (by norm_num)) (by norm_num)⟩
   gK := ⟨3 / 1000, by norm_num⟩
   costSavings := ⟨175 / 1000, by constructor <;> norm_num⟩
+  nonSubShare := ⟨25 / 100, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Pessimistic (highest-plausible displacement) calibration: lower labor
@@ -130,6 +136,7 @@ def calPessimistic : ModelCalibration where
     exact div_pos (Real.log_pos (by norm_num)) (by norm_num)⟩
   gK := ⟨3 / 1000, by norm_num⟩
   costSavings := ⟨250 / 1000, by constructor <;> norm_num⟩
+  nonSubShare := ⟨20 / 100, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-! ### Part 2 — Validation theorems V1–V6
