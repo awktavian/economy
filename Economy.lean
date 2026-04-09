@@ -22,3 +22,4 @@ import Economy.Inequality
 import Economy.ScenarioSpace
 import Economy.Calibration
 import Economy.JobSwapping
+import Economy.RecessionShock

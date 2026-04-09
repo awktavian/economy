@@ -74,6 +74,12 @@ structure ModelCalibration where
       ≈ 25% of US payroll, BLS OES 2026). The two-bucket Cobb-Douglas floor in
       `Economy.JobSwapping`. -/
   nonSubShare : {x : ℝ // 0 < x ∧ x < 1}
+  /-- Recession Poisson hazard per month (NBER post-1950 ≈ 0.015). -/
+  recessionHazard : {x : ℝ // 0 ≤ x ∧ x ≤ 3 / 10}
+  /-- Average recession duration in months (NBER post-1950 ≈ 10). -/
+  recessionDuration : {x : ℝ // 0 < x}
+  /-- Per-month fractional GDP shock during a recession (≈ 0.0025). -/
+  recessionShock : {x : ℝ // 0 ≤ x ∧ x < 1}
   /-- Ordering constraint: base horizon strictly below saturation horizon. -/
   H_min_lt_H_max : H_min.val < H_max.val
 
@@ -104,6 +110,9 @@ def calBEA2026 : ModelCalibration where
   gK := ⟨3 / 1000, by norm_num⟩
   costSavings := ⟨175 / 1000, by constructor <;> norm_num⟩
   nonSubShare := ⟨25 / 100, by constructor <;> norm_num⟩
+  recessionHazard := ⟨15 / 1000, by constructor <;> norm_num⟩
+  recessionDuration := ⟨10, by norm_num⟩
+  recessionShock := ⟨25 / 10000, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Baseline calibration (METR 2019–25 slope). Same BEA parameters but with
@@ -120,6 +129,9 @@ def calBaseline : ModelCalibration where
   gK := ⟨3 / 1000, by norm_num⟩
   costSavings := ⟨175 / 1000, by constructor <;> norm_num⟩
   nonSubShare := ⟨25 / 100, by constructor <;> norm_num⟩
+  recessionHazard := ⟨15 / 1000, by constructor <;> norm_num⟩
+  recessionDuration := ⟨10, by norm_num⟩
+  recessionShock := ⟨25 / 10000, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Pessimistic (highest-plausible displacement) calibration: lower labor
@@ -137,6 +149,9 @@ def calPessimistic : ModelCalibration where
   gK := ⟨3 / 1000, by norm_num⟩
   costSavings := ⟨250 / 1000, by constructor <;> norm_num⟩
   nonSubShare := ⟨20 / 100, by constructor <;> norm_num⟩
+  recessionHazard := ⟨25 / 1000, by constructor <;> norm_num⟩
+  recessionDuration := ⟨14, by norm_num⟩
+  recessionShock := ⟨40 / 10000, by constructor <;> norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-! ### Part 2 — Validation theorems V1–V6
