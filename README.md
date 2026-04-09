@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="brand/wordmark-display.svg" alt="Awkronos" height="48">
+</p>
+
 # economy
 
 **The math behind [tim.awkronos.com/economy](https://tim.awkronos.com/economy).**
