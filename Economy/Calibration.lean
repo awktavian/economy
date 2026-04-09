@@ -80,6 +80,12 @@ structure ModelCalibration where
   recessionDuration : {x : ℝ // 0 < x}
   /-- Per-month fractional GDP shock during a recession (≈ 0.0025). -/
   recessionShock : {x : ℝ // 0 ≤ x ∧ x < 1}
+  /-- Aggregate hyperscaler debt stack ($T, ≈ 0.4 in 2026 = $400B). -/
+  debtStack : {x : ℝ // 0 ≤ x}
+  /-- Interest rate on the hyperscaler debt stack (per month, ≈ 0.005/mo). -/
+  interestRate : {x : ℝ // 0 ≤ x ∧ x < 1}
+  /-- Maintenance-only capital growth rate (per month, ≈ 0.00125/mo ≈ 1.5%/yr). -/
+  gK_maintenance : {x : ℝ // 0 ≤ x}
   /-- Ordering constraint: base horizon strictly below saturation horizon. -/
   H_min_lt_H_max : H_min.val < H_max.val
 
@@ -113,6 +119,9 @@ def calBEA2026 : ModelCalibration where
   recessionHazard := ⟨15 / 1000, by constructor <;> norm_num⟩
   recessionDuration := ⟨10, by norm_num⟩
   recessionShock := ⟨25 / 10000, by constructor <;> norm_num⟩
+  debtStack := ⟨4 / 10, by norm_num⟩
+  interestRate := ⟨5 / 1000, by constructor <;> norm_num⟩
+  gK_maintenance := ⟨125 / 100000, by norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Baseline calibration (METR 2019–25 slope). Same BEA parameters but with
@@ -132,6 +141,9 @@ def calBaseline : ModelCalibration where
   recessionHazard := ⟨15 / 1000, by constructor <;> norm_num⟩
   recessionDuration := ⟨10, by norm_num⟩
   recessionShock := ⟨25 / 10000, by constructor <;> norm_num⟩
+  debtStack := ⟨4 / 10, by norm_num⟩
+  interestRate := ⟨5 / 1000, by constructor <;> norm_num⟩
+  gK_maintenance := ⟨125 / 100000, by norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-- Pessimistic (highest-plausible displacement) calibration: lower labor
@@ -152,6 +164,9 @@ def calPessimistic : ModelCalibration where
   recessionHazard := ⟨25 / 1000, by constructor <;> norm_num⟩
   recessionDuration := ⟨14, by norm_num⟩
   recessionShock := ⟨40 / 10000, by constructor <;> norm_num⟩
+  debtStack := ⟨6 / 10, by norm_num⟩
+  interestRate := ⟨10 / 1000, by constructor <;> norm_num⟩
+  gK_maintenance := ⟨125 / 100000, by norm_num⟩
   H_min_lt_H_max := by norm_num
 
 /-! ### Part 2 — Validation theorems V1–V6
