@@ -303,6 +303,12 @@ noncomputable def metrFastSlope : ℝ := Real.log 2 / 4
 /-- METR baseline-regime slope, 2019-25 corpus: log 2 / 7 ≈ 0.0990 nats/month. -/
 noncomputable def metrBaselineSlope : ℝ := Real.log 2 / 7
 
+/-- METR ACCELERATED slope: TH1.1 2026-01 notes a ~89-day (≈3 month) doubling
+    pace measured since 2024, with ~1.5× uncertainty either direction. This
+    constant represents the post-2024 current-pace anchor, held alongside the
+    2019-2025 `metrFastSlope` historical-average anchor. Not a replacement. -/
+noncomputable def metrAcceleratedSlope : ℝ := Real.log 2 / 3
+
 /-- THEOREM: the doubling time derived from `metrFastSlope` is exactly 4 months.
     This pins the empirical constant to the regression parameter, making 4
     no longer a free choice. -/
@@ -315,6 +321,11 @@ theorem doublingTime_metrFast : doublingTimeFromSlope metrFastSlope = 4 := by
 theorem doublingTime_metrBaseline : doublingTimeFromSlope metrBaselineSlope = 7 := by
   unfold doublingTimeFromSlope metrBaselineSlope
   have hlog : Real.log 2 ≠ 0 := ne_of_gt (Real.log_pos (by norm_num))
+  field_simp
+
+/-- THEOREM: the doubling time derived from `metrAcceleratedSlope` is exactly 3 months. -/
+theorem doublingTime_metrAccelerated : doublingTimeFromSlope metrAcceleratedSlope = 3 := by
+  unfold doublingTimeFromSlope metrAcceleratedSlope
   field_simp
 
 /-- THEOREM: `intelligenceLevel t (doublingTimeFromSlope β) = exp (β · t)`
