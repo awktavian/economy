@@ -94,4 +94,31 @@ theorem welfareDelta_trans (C1 C2 C3 : ℝ) :
     welfareDelta C1 C2 + welfareDelta C2 C3 = welfareDelta C1 C3 := by
   unfold welfareDelta; ring
 
+/-- THEOREM (welfare-GDP threshold): welfare falls even when GDP rises if and
+    only if the labor-share drop outweighs the productivity gain, i.e.,
+    λ' * Y' < λ * Y. This is the universal version of `welfare_can_fall_with_gdp_rise`:
+    for EVERY pair of (Y, Y') with Y < Y' and EVERY labor share pair, the sign
+    of welfare change is determined by whether consumption rises or falls.
+
+    Equivalently: welfare falls iff the labor share ratio λ'/λ < Y/Y',
+    i.e., the relative labor share decline exceeds the relative productivity gain. -/
+theorem welfare_falls_iff_consumption_falls {Y Y' lam lam' : ℝ}
+    (hY : 0 < Y) (hY' : 0 < Y') (hlam : 0 < lam) (hlamp : 0 < lam') :
+    welfareDelta (lam * Y) (lam' * Y') < 0 ↔ lam' * Y' < lam * Y := by
+  have hC : 0 < lam * Y := mul_pos hlam hY
+  have hC' : 0 < lam' * Y' := mul_pos hlamp hY'
+  exact welfareDelta_neg_iff hC hC'
+
+/-- THEOREM (labor-share-drop threshold, Acemoglu-Restrepo framing):
+    When GDP rises (Y' > Y), welfare still falls iff the relative labor share
+    drop exceeds the relative productivity gain:
+      λ'/λ < Y/Y'.
+    This gives the exact threshold at which displacement outweighs growth. -/
+theorem welfare_falls_of_gdp_rise_iff {Y Y' lam lam' : ℝ}
+    (hY : 0 < Y) (hY' : 0 < Y') (hlam : 0 < lam) (hlamp : 0 < lam')
+    (_hgdp : Y < Y') :
+    welfareDelta (lam * Y) (lam' * Y') < 0 ↔ lam' * Y' < lam * Y := by
+  exact welfare_falls_iff_consumption_falls hY hY' hlam hlamp
+
+
 end Economy

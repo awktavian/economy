@@ -105,6 +105,18 @@ theorem acemoglu_below_goldman_parameterized (p q : TFPParams)
   rw [acemoglu_low_corner p hpx hpc hpf, goldman_high_corner q hqx hqc hqf]
   norm_num
 
+/-- THEOREM (litBox upper bound is tight): the 12% bound is attained at
+    (exposure=0.40, costSavings=0.30, friction=0). There exists a LitBox
+    parameterization achieving exactly ΔTFP = 12/100, so `litBox_upper` is sharp. -/
+theorem litBox_upper_tight :
+    ∃ (p : TFPParams), LitBox p ∧ deltaTFP p = 12 / 100 := by
+  refine ⟨⟨40 / 100, 30 / 100, 0,
+    by norm_num, by norm_num, by norm_num, by norm_num, by norm_num, by norm_num⟩,
+    ?_, ?_⟩
+  · constructor <;> norm_num
+  · unfold deltaTFP; norm_num
+
+
 end
 
 end Economy
