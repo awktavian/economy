@@ -18,7 +18,7 @@ and verify that the output shows `sorry: 0   axioms: 0   build: GREEN   sound: C
 
 ## The toolchain
 
-- Lean 4 (`lean-4.28.0`) + Mathlib, pinned via `lean-toolchain` and `lake-manifest.json`.
+- Lean 4 (`lean-4.30.0-rc1`) + Mathlib, pinned via `lean-toolchain` and `lake-manifest.json`.
 - `lake build economy` for a full build (~12s cached, ~45s cold).
 - `lake env lean Economy/Foo.lean` for single-file type-check (~7s). Use this for iteration. Never run a full `lake build` in the middle of a proof exploration.
 - `make proof` for the canonical build + report used by the daemon, the blog footer, and the statusline.
