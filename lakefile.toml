@@ -5,7 +5,7 @@ defaultTargets = ["Economy"]
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-version = "git#8f9d9cff6bd728b17a24e163c9402775d9e6a365"
+version = "git#8eda17ddee44c50e0599125d97edc229a9bb0244"
 
 [[lean_lib]]
 name = "Economy"
