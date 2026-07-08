@@ -13,8 +13,13 @@
     Inequality", Econometrica 90(5): 1973–2016.
   * Acemoglu (2024), "The Simple Macroeconomics of AI", NBER w32487, §5.
 
-  TIER: THEOREM for monotonicity under log; CONJECTURE (sorry) for the
-  Jensen-on-CES welfare-GDP gap (needs the CES→CD limit and concavity machinery).
+  TIER: THEOREM for every result in this file, including the welfare-GDP gap
+  decomposition (`welfare_gdp_gap`), the explicit welfare-can-fall witness
+  (`welfare_can_fall_with_gdp_rise`), and the exact threshold
+  (`welfare_falls_iff_consumption_falls`) — all kernel-checked. The header
+  formerly listed a "CONJECTURE (sorry)" for a Jensen-on-CES gap; that note
+  was stale — the corpus has zero sorries, and the Jensen-on-CES version is
+  NOT formalized here (absent, not sorry'd).
 -/
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Tactic

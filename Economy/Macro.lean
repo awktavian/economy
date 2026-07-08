@@ -22,6 +22,9 @@
 
   TIER: THEOREM for identities and structural inequalities; FRAMEWORK for the
   Cobb-Douglas functional form itself (which is a modeling choice, not a theorem).
+  The `SolowGrowth` results are CONDITIONAL THEOREMS: they are proved relative
+  to the assumed structure field `solow_id` (the log-linearized Solow identity),
+  which is not derived from `CobbDouglas.Y` in this file.
 -/
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
@@ -156,10 +159,14 @@ theorem solow_residual (s : SolowGrowth) :
   have := s.solow_id
   linarith
 
-/-- THEOREM (Ghost GDP lower bound): with constant labor (`gL = 0`), output
-    growth equals TFP growth plus `(1-α) · capital growth`. So output can grow
-    without ANY labor input, contingent on the TFP + K channels.
-    This is the 2026 "Ghost GDP" narrative stated as a theorem. -/
+/-- CONDITIONAL THEOREM (Ghost GDP under the assumed Solow identity): with
+    constant labor (`gL = 0`), output growth equals TFP growth plus
+    `(1-α) · capital growth`. Conditional on `SolowGrowth.solow_id` — the
+    log-linearized identity `gY = gA + (1-α)·gK + α·gL`, which is an ASSUMED
+    structure field here, not derived from `CobbDouglas.Y` in this file.
+    Given that assumption, the proof is substitution of `gL = 0` plus
+    `linarith`. This is the 2026 "Ghost GDP" narrative, conditional on the
+    log-linearization. -/
 theorem ghost_gdp_constant_labor (s : SolowGrowth) (hL : s.gL = 0) :
     s.gY = s.gA + (1 - s.α) * s.gK := by
   have h := s.solow_id

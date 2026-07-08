@@ -3,7 +3,8 @@
   The five pipeline theorems tying `ModelCalibration` to the forward-time
   `Scenario` trajectory, and from there to the headline forecast claims.
 
-  TIER: THEOREM for every result.
+  TIER: THEOREM for P1–P4; NUMERICAL OBSERVATION for P5 (free-parameter
+  witness — see its docstring).
 -/
 import Economy.Calibration
 import Mathlib.Tactic
@@ -76,10 +77,13 @@ theorem pipeline_welfare_sign_under_collapse
   rw [welfareDelta_neg_iff hC hC']
   exact hlt
 
-/-- **P5. Displacement meets the Brynjolfsson anchor.**
-    There exist matching parameters (s, f) within the literature range such
-    that the Mortensen-Pissarides steady-state unemployment rate satisfies
-    `u* ≥ 6/100` — matching the Brynjolfsson Canaries young-worker figure. -/
+/-- **P5. Displacement meets the Brynjolfsson anchor — NUMERICAL OBSERVATION.**
+    There exist matching parameters (s, f) such that the Mortensen-Pissarides
+    steady-state unemployment rate satisfies `u* ≥ 6/100`, matching the
+    Brynjolfsson Canaries young-worker figure. HONESTY NOTE: `(s, f)` are
+    unconstrained FREE PARAMETERS (the statement imposes no literature range),
+    chosen as `s = 6/100`, `f = 94/100` so that `s + f = 1` and `u* = 6/100`
+    exactly. A consistency exhibit, not a falsifiable prediction. -/
 theorem pipeline_displacement_meets_brynjolfsson :
     ∃ s f : ℝ, 0 ≤ s ∧ 0 < f ∧ steadyStateU s f ≥ 6 / 100 := by
   refine ⟨6 / 100, 94 / 100, by norm_num, by norm_num, ?_⟩

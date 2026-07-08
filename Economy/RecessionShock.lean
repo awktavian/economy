@@ -6,15 +6,17 @@
   growth rate g_Y drops by `shockSize` for `duration` months, then recovers.
   Poisson hazard rate `λ_rec` per month governs the arrival of shocks.
 
-  The expected fractional GDP hit per T-month window is:
+  The mean-drag term the dashboard surfaces alongside the smooth-growth
+  trajectory is the named product
 
-      E[ΔY/Y over T months] = -λ · duration · shockSize
+      λ · duration · shockSize · T
 
-  per unit time, integrated over T. This is the closed-form mean-loss term
-  the dashboard surfaces alongside the smooth-growth trajectory. We also
-  prove a deterministic worst-case envelope (one shock landing at t=0 vs
-  no shock) that bounds the cumulative log-GDP at the bottom of the
-  confidence band.
+  adopted DEFINITIONALLY as the model's expected-loss functional form. No
+  Poisson process is formalized in this file: `expectedCumLoss` is a
+  definition, and `recession_expected_loss` is its `rfl` unfolding, not a
+  derived expectation. The same holds for the "worst-case envelope"
+  `lowerEnvelopeLoss = duration · shockSize`. What IS proved: the drag is
+  nonnegative and always weakly lowers the smooth trajectory.
 
   The Sahm rule is a real-time recession-detection tool: when the 3-month-
   average unemployment rate rises by ≥ 0.5pp above its trailing 12-month
@@ -29,7 +31,13 @@
     Hutchins Center Working Paper. The 0.5pp / 12mo rule.
   * BEA NIPA: average peak-to-trough GDP loss ≈ 2.5%.
 
-  TIER: THEOREM for all five results below.
+  TIER: FRAMEWORK for the mean-drag functional form (a modeling choice stated
+  definitionally, not derived from a formalized stochastic process); THEOREM
+  for the inequalities (`expectedCumLoss_nn`, `recession_adjusted_growth_le`,
+  `recession_lower_envelope_nn`, `recession_drag_le_smooth`,
+  `sahm_rule_implication`); NUMERICAL OBSERVATION for the NBER-anchored
+  calibration numbers — their product (1.35% over 36 months) is an input
+  product, not a derived prediction.
 -/
 import Economy.Forecast
 import Economy.Calibration
@@ -84,12 +92,14 @@ theorem expectedCumLoss_nn (r : RecessionParams) {T : ℝ} (hT : 0 ≤ T) :
 
 end RecessionParams
 
-/-! ### Theorem 1 — expected loss closed form -/
+/-! ### Definitional exposure — mean-drag closed form -/
 
-/-- THEOREM (recession_expected_loss): the expected cumulative fractional
-    GDP loss from Poisson recession shocks over `T` months equals
-    `λ · duration · shockSize · T`. This is by definition; the value is
-    that the closed form is exposed as a kernel-checked function. -/
+/-- DEFINITIONAL EXPOSURE (recession_expected_loss): `expectedCumLoss T`
+    unfolds to the named product `λ · duration · shockSize · T` — closed by
+    `rfl`. This is NOT a derived Poisson expectation: no stochastic process
+    is formalized here. The product is the standard mean-drag heuristic
+    (hazard × duration × per-month shock × window), adopted as a modeling
+    input and exposed under a stable name for citation. -/
 theorem recession_expected_loss (r : RecessionParams) (T : ℝ) :
     r.expectedCumLoss T = r.lambda * r.duration * r.shockSize * T := rfl
 
@@ -105,17 +115,19 @@ theorem recession_adjusted_growth_le (r : RecessionParams) (g : ℝ) :
     mul_nonneg h1 r.shock_nn
   linarith
 
-/-! ### Theorem 2 — deterministic confidence envelope -/
+/-! ### Definitional exposure — deterministic envelope (nonnegativity proved) -/
 
 /-- The lower envelope: cumulative log-GDP under the worst case of one shock
     landing immediately at t=0 and persisting for the full `duration`. -/
 def RecessionParams.lowerEnvelopeLoss (r : RecessionParams) : ℝ :=
   r.duration * r.shockSize
 
-/-- THEOREM (recession_lower_envelope_bound): the worst-case immediate-shock
-    cumulative loss is bounded above by `duration · shockSize`. This is the
-    deterministic floor of the confidence band — no random realization can
-    do worse than starting in a shock and persisting for the full duration. -/
+/-- DEFINITIONAL EXPOSURE (recession_lower_envelope_bound): `lowerEnvelopeLoss`
+    unfolds to `duration · shockSize` — closed by `rfl`. It restates the
+    definition; it does not prove a worst-case property of any formalized
+    random process (none exists in this file). The "no realization does
+    worse" reading is heuristic prose about the intended model, not a
+    theorem here. -/
 theorem recession_lower_envelope_bound (r : RecessionParams) :
     r.lowerEnvelopeLoss = r.duration * r.shockSize := rfl
 
@@ -163,7 +175,7 @@ theorem recession_drag_le_smooth (s : Scenario) (r : RecessionParams)
   have := r.expectedCumLoss_nn ht
   linarith
 
-/-! ### Theorem 5 — magnitude bound for the BEA calibration -/
+/-! ### NUMERICAL OBSERVATION — BEA calibration arithmetic -/
 
 /-- BEA / NBER post-1950 calibration: monthly hazard 0.015, duration 10mo,
     monthly shock 0.0025. Annualized: 18% / yr probability, 2.5% peak-to-
@@ -177,9 +189,11 @@ def recessionBEA2026 : RecessionParams where
   shock_nn := by norm_num
   shock_lt_one := by norm_num
 
-/-- THEOREM (recession_BEA_expected_36mo): the expected fractional GDP
-    loss over 36 months under the BEA 2026 calibration equals
-    0.015 · 10 · 0.0025 · 36 = 0.0135 (≈ 1.35%). -/
+/-- NUMERICAL OBSERVATION (recession_BEA_expected_36mo): under the
+    NBER-anchored inputs, the mean-drag input product evaluates to
+    0.015 · 10 · 0.0025 · 36 = 0.0135 (≈ 1.35%) over 36 months. The
+    arithmetic is kernel-checked; the number is a product of calibration
+    inputs, not a derived prediction. -/
 theorem recession_BEA_expected_36mo :
     recessionBEA2026.expectedCumLoss 36 = 135 / 10000 := by
   unfold RecessionParams.expectedCumLoss recessionBEA2026

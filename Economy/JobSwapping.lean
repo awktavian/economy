@@ -34,7 +34,12 @@
     (childcare 2.4M, nursing 3.1M, skilled trades 7.3M, personal-care 4.5M
     against ≈ 158M total nonfarm payroll, US 2026).
 
-  TIER: THEOREM for all four results below. No sorry, no axiom, no placeholder.
+  TIER: THEOREM for `jobSwap_cobbDouglas_zero_Lnon_limit`,
+  `jobSwap_cesLimit_isCobbDouglas`, `jobSwap_welfare_lower_bound`, and
+  `jobSwap_welfare_strict_mono_in_Lnon`; DEFINITIONAL EXPOSURE (rfl
+  restatements of `cobbOutput`'s definition, not theorems) for
+  `jobSwap_cobbDouglas_floor` and `integrated_exposure_bounded`.
+  No sorry, no axiom, no placeholder.
 -/
 import Economy.CES
 import Economy.Calibration
@@ -110,11 +115,11 @@ non-substitutable bucket raises it by `2^(1-α)`. Below we prove the
 augmented capital. This is the rigorous statement that `L_non` is a HARD
 FLOOR. -/
 
-/-- THEOREM (jobSwap_cobbDouglas_floor): in the two-bucket Cobb-Douglas nest,
-    output is identically `augK^α · L_non^(1-α)`. This is `cobbOutput`'s
-    definition exposed as an extensional equality, with both factors visible.
-    The role of `L_non` as a multiplicative factor — not an additive term —
-    is what makes it a hard floor. -/
+/-- DEFINITIONAL EXPOSURE (jobSwap_cobbDouglas_floor): `cobbOutput` unfolds
+    to `augK^α · L_non^(1-α)` — closed by `rfl`. A named unfolding retained
+    for citation, not mathematical content. The genuine hard-floor content
+    lives in `jobSwap_cobbDouglas_zero_Lnon_limit` (output → 0 as L_non → 0⁺)
+    and `jobSwap_welfare_strict_mono_in_Lnon` below. -/
 theorem jobSwap_cobbDouglas_floor (p : JobSwapParams) :
     p.cobbOutput = p.augK ^ p.α * p.L_non ^ (1 - p.α) := rfl
 
@@ -191,16 +196,16 @@ theorem jobSwap_welfare_strict_mono_in_Lnon (p p' : JobSwapParams)
   have := mul_lt_mul_of_pos_left hL_lt hpos
   linarith
 
-/-! ### Theorem 4 — Bounded ceiling: integrated exposure -/
+/-! ### Definitional exposure — the two-bucket ceiling restated -/
 
-/-- THEOREM (integrated_exposure_bounded): in the two-bucket Cobb-Douglas
-    nest, output is bounded above by `augK^α · L_non^(1-α)` (the two-bucket
-    ceiling). Equality holds — this is just `cobbOutput` itself — but the
-    economic content is: there is no way to push output above this curve
-    by adding more capital alone. The α exponent on `augK` is strictly
-    less than one, so capital and AI hit diminishing returns; the
-    `(1-α)` exponent on `L_non` is also less than one, but L_non enters as
-    a SEPARATE factor, not an additive term, so it cannot be substituted away. -/
+/-- DEFINITIONAL EXPOSURE (integrated_exposure_bounded): the inequality
+    `cobbOutput ≤ augK^α · L_non^(1-α)` is closed by `le_of_eq rfl` — the
+    right-hand side IS `cobbOutput`'s definition, so this states `X ≤ X`.
+    It does not prove a ceiling property beyond the definition itself; the
+    diminishing-returns and cannot-substitute-away readings are properties
+    of the chosen functional form (FRAMEWORK), carried mathematically by
+    `jobSwap_cobbDouglas_zero_Lnon_limit` and
+    `jobSwap_welfare_strict_mono_in_Lnon`, not by this restatement. -/
 theorem integrated_exposure_bounded (p : JobSwapParams) :
     p.cobbOutput ≤ p.augK ^ p.α * p.L_non ^ (1 - p.α) := le_of_eq rfl
 

@@ -4,7 +4,8 @@
 
   ECONOMIC CLAIM: With CES aggregator Y = (α·y1^ρ + (1-α)·y2^ρ)^(1/ρ),
   ρ = (σ-1)/σ, the elasticity of substitution is σ. As σ → 1, the aggregator
-  tends to Cobb-Douglas (proved here as a CONJECTURE with L'Hôpital citation).
+  tends to Cobb-Douglas (fully proved below via the log-difference-quotient
+  argument — `ces_to_cobb_douglas_limit`).
   The displacement-vs-productivity decomposition (Acemoglu-Restrepo 2022)
   follows from the sign of (σ-1).
 
@@ -14,9 +15,11 @@
   * Arrow, Chenery, Minhas, Solow (1961), "Capital-Labor Substitution and
     Economic Efficiency", Review of Economics and Statistics 43(3): 225–250.
 
-  TIER: THEOREM for the homogeneity-of-degree-one and nonnegativity properties;
-  CONJECTURE (sorry + citation) for the σ → 1 Cobb-Douglas limit and for the
-  marginal-rate-of-substitution identity (which needs derivatives).
+  TIER: THEOREM for every result in this file, including the σ → 1
+  Cobb-Douglas limit (`ces_to_cobb_douglas_limit`, kernel-checked ε-δ proof;
+  formerly listed here as a CONJECTURE — that header note was stale). The
+  marginal-rate-of-substitution identity is NOT formalized in this file
+  (no sorry exists; it is simply absent).
 -/
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
