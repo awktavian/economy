@@ -6,7 +6,7 @@
 
 **The math behind [tim.awkronos.com/economy](https://tim.awkronos.com/economy).**
 
-Every number on that page traces to a theorem in this repository. 202 theorems. Zero sorries. Zero unchecked axioms. Lean 4 + Mathlib.
+Every number on that page traces to a theorem in this repository. 206 theorems. Zero sorries. Zero unchecked axioms. Lean 4 + Mathlib.
 
 If you got here from the blog post and just want to find the number you were reading about, start with the [Receipts](#receipts) section below.
 
@@ -81,20 +81,22 @@ cd economy
 make proof
 ```
 
-`make proof` runs `lake build` and reports file count, theorem count, lemma count, definition count, sorry count, axiom count, errors, and soundness. Expected output:
+`make proof` runs `lake build` and reports file count, theorem count, lemma count, definition count, sorry count, axiom count, errors, and soundness. Current report:
 
 ```
-files: 28   lines: 4624   theorems: 202   lemmas: 3   definitions: 83
-axioms: 0   sorry: 0   errors: 0   build: GREEN   sound: CLEAN
+files: 28   lines: 4732   theorems: 206   lemmas: 3   definitions: 84
+axioms: 0   sorry: 0   errors: 0   build: GREEN
 ```
 
-To check a specific theorem\'s axiom dependencies:
+One known gap, stated once: the verifier currently reports the corpus as coverage-partial, because `Economy/EndToEndForecast.lean` is not imported by the `Economy.lean` umbrella and so sits outside the default build target's reach. The module itself compiles and its theorems check individually (see below); re-attaching it to the umbrella is a pending one-line fix. The live numbers are in `/tmp/proof-report.json`.
+
+To check a specific theorem's axiom dependencies:
 
 ```bash
-lake env lean -- -e \'import Economy.EndToEndForecast; #print axioms Economy.pipeline_metr_horizon_36mo\'
+printf 'import Economy.EndToEndForecast\n#print axioms Economy.pipeline_metr_horizon_36mo\n' | lake env lean --stdin
 ```
 
-You should see `[propext, Classical.choice, Quot.sound]` — the three foundational axioms of Lean 4. Nothing else. If you see anything more, that theorem has a hidden dependency and the soundness claim is false for it.
+You should see `depends on axioms: [propext, Classical.choice, Quot.sound]` — the three foundational axioms of Lean 4. Nothing else. If you see anything more, that theorem has a hidden dependency and the soundness claim is false for it.
 
 ## Changing the calibration
 
