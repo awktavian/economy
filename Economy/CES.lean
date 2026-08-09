@@ -23,6 +23,8 @@
 -/
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
+import Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
+import Mathlib.Analysis.SpecialFunctions.Pow.Continuity
 import Mathlib.Analysis.SpecialFunctions.Log.Deriv
 import Mathlib.Tactic
 
@@ -239,5 +241,107 @@ theorem sigmaToRho_neg_iff {σ : ℝ} (hσ : 0 < σ) :
   · intro h
     right
     exact ⟨by linarith, hσ⟩
+
+/-! ### Rung-1 #1: output ceiling as capital → ∞ under complementary tasks (σ < 1)
+
+  ECONOMIC CLAIM (sharper than "capital cannot fully replace labor"): when
+  `ρ < 0` (equivalently `σ < 1`, complements), holding labor `y2` fixed, no
+  finite amount of capital `y1` can push aggregate output past the
+  labor-determined ceiling `(1 - α) ^ (1/ρ) · y2`, and output rises
+  monotonically toward that exact value as `y1 → ∞`. Capital is not merely
+  "limited" in its ability to substitute for labor — the limiting value is
+  pinned down exactly, and it is labor alone (via `y2` and the weight
+  `1 - α`) that sets it. -/
+
+/-- THEOREM: for `ρ < 0`, aggregate output is *strictly* below the
+    labor-only ceiling `(1 - α) ^ (1/ρ) · y2` for every finite, positive
+    level of capital `y1`. Proof: the inner CES sum strictly exceeds its
+    `y1 → ∞` limit `(1 - α) · y2 ^ ρ` (since `α · y1 ^ ρ > 0`), and raising
+    to the power `1/ρ < 0` reverses the inequality (`Real.rpow_lt_rpow_of_neg`),
+    landing exactly on `(1 - α) ^ (1/ρ) · y2` after simplifying the compound
+    rpow via `Real.mul_rpow` / `Real.rpow_mul`. -/
+theorem ces_capital_output_ceiling_lt {ρ α y1 y2 : ℝ}
+    (hρ : ρ < 0) (hα0 : 0 < α) (hα1 : α < 1) (hy1 : 0 < y1) (hy2 : 0 < y2) :
+    cesAggregate ρ α y1 y2 < (1 - α) ^ (1 / ρ) * y2 := by
+  have hρne : ρ ≠ 0 := hρ.ne
+  unfold cesAggregate
+  have h1α : 0 < 1 - α := by linarith
+  have hy2ρ : 0 < y2 ^ ρ := Real.rpow_pos_of_pos hy2 _
+  have hy1ρ : 0 < y1 ^ ρ := Real.rpow_pos_of_pos hy1 _
+  have hlabor_pos : 0 < (1 - α) * y2 ^ ρ := mul_pos h1α hy2ρ
+  have hstrict : (1 - α) * y2 ^ ρ < α * y1 ^ ρ + (1 - α) * y2 ^ ρ := by
+    have hcap_pos : 0 < α * y1 ^ ρ := mul_pos hα0 hy1ρ
+    linarith
+  have hzneg : (1 / ρ : ℝ) < 0 := div_neg_of_pos_of_neg one_pos hρ
+  have hmain := Real.rpow_lt_rpow_of_neg hlabor_pos hstrict hzneg
+  have hrw : ((1 - α) * y2 ^ ρ) ^ (1 / ρ) = (1 - α) ^ (1 / ρ) * y2 := by
+    rw [Real.mul_rpow h1α.le hy2ρ.le]
+    have hy2_outer : (y2 ^ ρ) ^ (1 / ρ) = y2 := by
+      rw [← Real.rpow_mul hy2.le]
+      have hmul : ρ * (1 / ρ) = 1 := by field_simp
+      rw [hmul, Real.rpow_one]
+    rw [hy2_outer]
+  rw [hrw] at hmain
+  exact hmain
+
+/-- THEOREM: the ceiling in `ces_capital_output_ceiling_lt` is exactly
+    attained in the limit — aggregate output tends to
+    `(1 - α) ^ (1/ρ) · y2` as `y1 → ∞`, confirming the bound is sharp
+    (not merely an upper estimate). Proof: `y1 ^ ρ → 0` since `ρ < 0`
+    (`tendsto_rpow_neg_atTop`), so the inner sum tends to `(1-α) · y2 ^ ρ`,
+    and raising to the (fixed, well-defined since the limit is positive)
+    power `1/ρ` is continuous there (`Filter.Tendsto.rpow_const`). -/
+theorem ces_capital_output_ceiling_tendsto {ρ α y2 : ℝ}
+    (hρ : ρ < 0) (hα0 : 0 < α) (hα1 : α < 1) (hy2 : 0 < y2) :
+    Filter.Tendsto (fun y1 => cesAggregate ρ α y1 y2) Filter.atTop
+      (nhds ((1 - α) ^ (1 / ρ) * y2)) := by
+  have hρne : ρ ≠ 0 := hρ.ne
+  have h1α : 0 < 1 - α := by linarith
+  have hy2ρ : 0 < y2 ^ ρ := Real.rpow_pos_of_pos hy2 _
+  have hlabor_pos : 0 < (1 - α) * y2 ^ ρ := mul_pos h1α hy2ρ
+  have hcap_tendsto : Filter.Tendsto (fun y1 : ℝ => y1 ^ ρ) Filter.atTop (nhds 0) := by
+    have hpos : (0 : ℝ) < -ρ := by linarith
+    simpa using tendsto_rpow_neg_atTop hpos
+  have hinner_tendsto : Filter.Tendsto
+      (fun y1 : ℝ => α * y1 ^ ρ + (1 - α) * y2 ^ ρ) Filter.atTop
+      (nhds ((1 - α) * y2 ^ ρ)) := by
+    have h1 : Filter.Tendsto (fun y1 : ℝ => α * y1 ^ ρ) Filter.atTop (nhds 0) := by
+      simpa using hcap_tendsto.const_mul α
+    have h2 : Filter.Tendsto (fun _ : ℝ => (1 - α) * y2 ^ ρ) Filter.atTop
+        (nhds ((1 - α) * y2 ^ ρ)) := tendsto_const_nhds
+    simpa using h1.add h2
+  have hfinal := hinner_tendsto.rpow_const (p := 1 / ρ) (Or.inl hlabor_pos.ne')
+  have hrw : ((1 - α) * y2 ^ ρ) ^ (1 / ρ) = (1 - α) ^ (1 / ρ) * y2 := by
+    rw [Real.mul_rpow h1α.le hy2ρ.le]
+    have hy2_outer : (y2 ^ ρ) ^ (1 / ρ) = y2 := by
+      rw [← Real.rpow_mul hy2.le]
+      have hmul : ρ * (1 / ρ) = 1 := by field_simp
+      rw [hmul, Real.rpow_one]
+    rw [hy2_outer]
+  rw [hrw] at hfinal
+  unfold cesAggregate
+  exact hfinal
+
+/-- THEOREM (Rung-1 #1 headline, σ-parametrized): with complementary tasks
+    (`0 < σ < 1`), aggregate output stays strictly below the labor-only
+    ceiling `(1 - α) ^ (1/ρ) · y2` (`ρ = sigmaToRho σ`) for every finite
+    capital level `y1 > 0`. This is the sharpened, quantitative form of
+    "capital cannot fully replace labor". -/
+theorem ces_sigma_lt_one_capital_ceiling {σ α y1 y2 : ℝ}
+    (hσ0 : 0 < σ) (hσ1 : σ < 1) (hα0 : 0 < α) (hα1 : α < 1)
+    (hy1 : 0 < y1) (hy2 : 0 < y2) :
+    cesAggregate (sigmaToRho σ) α y1 y2 < (1 - α) ^ (1 / sigmaToRho σ) * y2 :=
+  ces_capital_output_ceiling_lt ((sigmaToRho_neg_iff hσ0).mpr hσ1) hα0 hα1 hy1 hy2
+
+/-- THEOREM (Rung-1 #1 headline, sharpness): with complementary tasks
+    (`0 < σ < 1`), aggregate output rises monotonically toward — but never
+    reaches — the ceiling `(1 - α) ^ (1/ρ) · y2` as capital `y1 → ∞` with
+    labor `y2` fixed. Labor, not capital, sets the long-run scale of
+    output when tasks are complements. -/
+theorem ces_sigma_lt_one_capital_ceiling_tendsto {σ α y2 : ℝ}
+    (hσ0 : 0 < σ) (hσ1 : σ < 1) (hα0 : 0 < α) (hα1 : α < 1) (hy2 : 0 < y2) :
+    Filter.Tendsto (fun y1 => cesAggregate (sigmaToRho σ) α y1 y2) Filter.atTop
+      (nhds ((1 - α) ^ (1 / sigmaToRho σ) * y2)) :=
+  ces_capital_output_ceiling_tendsto ((sigmaToRho_neg_iff hσ0).mpr hσ1) hα0 hα1 hy2
 
 end Economy

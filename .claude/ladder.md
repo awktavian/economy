@@ -8,7 +8,7 @@ empirical inputs / structural theorems / calibration — separable by design.
 
 | # | Target | Why next | Est LOC |
 |---|---|---|---|
-| 1 | CES aggregate: elasticity σ < 1 ⇒ output floor as capital→∞ with labor fixed (sharper than "capital can't replace") | the floor theorem already exists in qualitative form | ~200 |
+| 1 | ~~CES aggregate: elasticity σ < 1 ⇒ output floor as capital→∞ with labor fixed (sharper than "capital can't replace")~~ **DONE** — `ces_sigma_lt_one_capital_ceiling` (strict ceiling) + `ces_sigma_lt_one_capital_ceiling_tendsto` (sharpness, limit attained) in `Economy/CES.lean`. Kernel-only axioms, `lake build` green. | the floor theorem already exists in qualitative form | ~200 |
 | 2 | Balanced-growth consistency: under Harrod-neutral tech progress, K/Y and interest rate are constant along BGP (Uzawa-adjacent) | structural spine extension | ~400 |
 | 3 | Doubling-path dominance: any exponential task-horizon doubling dominates linear at every future t past explicit crossing time | README already claims the qualitative version | ~150 |
 | 4 | Calibration-sensitivity: ∂(GDP uplift)/∂(task-horizon parameter) signed + bounded | makes scenario outputs differentiable-auditable | ~250 |
