@@ -6,7 +6,7 @@
 
 **The math behind [tim.awkronos.com/economy](https://tim.awkronos.com/economy).**
 
-Every number on that page traces to a theorem in this repository. 206 theorems. Zero sorries. Zero unchecked axioms. Lean 4 + Mathlib.
+Every number on that page traces to a theorem in this repository. 210 theorems. Zero sorries. Zero unchecked axioms. Lean 4 + Mathlib.
 
 If you got here from the blog post and just want to find the number you were reading about, start with the [Receipts](#receipts) section below.
 
