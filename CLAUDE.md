@@ -70,9 +70,20 @@ Plus three hardened failure-mode modules:
 
 ## How the blog footer is computed
 
-The blog at tim.awkronos.com/economy displays `202 theorems, 0 sorry, 0 axioms, commit 54077a1` in its footer. That number comes directly from `/tmp/proof-report.json`, which is written by `make proof`. If you change the corpus, `make proof` updates that file, and the blog footer must be kept in sync via the hand-edited HTML (`~/tim/web/economy/index.html` has a hardcoded theorem count in the footer).
+The blog at tim.awkronos.com/economy carries a theorem/sorry/axiom/commit
+footer, hardcoded in `~/tim/web/economy/index.html`. **This is the one
+remaining hand-maintained value in this repository, and it has already
+drifted**: the footer text quoted here was `202 theorems, 0 sorry, 0 axioms,
+commit 54077a1` while the compiler reports a different theorem count (see the
+generated block in `README.md`). A hand-typed number that must track a system
+fact is correct the day it is written and wrong forever after.
 
-When you add theorems, update the footer count. When you delete them, update the footer count. When you bump the commit, update the commit hash. The receipt is load-bearing; don\'t let it go stale.
+Until the footer is generated rather than typed, the rule is: after any corpus
+change, run `make proof`, then read the current values out of the generated
+block in `README.md` (`python3 ~/.claude/scripts/docstats-render.py write
+README.md`) and copy them into the HTML in the same commit. The durable fix is
+to render that footer from `/tmp/proof-report.json` at build time; do that
+instead of maintaining the copy by hand if you touch the web app.
 
 ## Common tasks
 

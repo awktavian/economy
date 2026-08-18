@@ -289,9 +289,10 @@ available if we switch the primary instantiation of `exposureFromHorizon`
 to `paretoCDF` (via `paretoCDF_strictMono_above_min`), because the Pareto
 CDF is strictly monotone on its entire support above `H_min`. This is
 documented in the README as a modelling choice, not a formal limitation.
-Upgrading the primary instance would cascade through ~15 downstream proofs;
-that refactor is out of scope for this pass and is left as future work with
-a fully-proved alternative already in hand.
+Upgrading the primary instance cascades through ~15 downstream proofs. Exact
+status: the alternative (`paretoCDF` via `paretoCDF_strictMono_above_min`) is
+already fully proved; what remains is the mechanical re-instantiation of those
+~15 consumers. Not blocked, not open mathematics — a named, sized refactor.
 
 ### Mathlib helpers used (no gaps required)
 
