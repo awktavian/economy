@@ -1,7 +1,7 @@
 # Economy — theorem ladder (written 2026-07-17, per orchestration.md §Frontier-rung)
 
-Compiler SSOT: 202 theorems, 0 sorry, 0 unchecked axioms (README claim;
-`/tmp/proof-report.json` is the count authority). Three-layer discipline:
+Compiler SSOT: 210 theorems, 0 sorry, 0 unchecked axioms (compiler census
+2026-08-18; `/tmp/proof-report.json` is the count authority). Three-layer discipline:
 empirical inputs / structural theorems / calibration — separable by design.
 
 ## Rung 1 — R1 established, natural next closures

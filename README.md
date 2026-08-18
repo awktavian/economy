@@ -81,14 +81,20 @@ cd economy
 make proof
 ```
 
-`make proof` runs `lake build` and reports file count, theorem count, lemma count, definition count, sorry count, axiom count, errors, and soundness. Current report:
+`make proof` runs the estate proof reporter (`proof_report.py --oneline economy`), which builds the project and prints the compiler-derived audit line:
 
 ```
-files: 28   lines: 4732   theorems: 206   lemmas: 3   definitions: 84
+LEAN_AUDIT: economy(A=0,S=0,O=0,C=0,E=0)
+```
+
+(`A` = unchecked axioms, `S` = sorries, `O` = open scientific obligations, `C` = conjectures, `E` = errors.) Source census at commit `8508bd9` (2026-08-18, counted by `grep -c` over the sources):
+
+```
+files: 28 (27 modules + umbrella)   lines: 4837   theorems: 210   lemmas: 0   definitions: 70
 axioms: 0   sorry: 0   errors: 0   build: GREEN
 ```
 
-One known gap, stated once: the verifier currently reports the corpus as coverage-partial, because `Economy/EndToEndForecast.lean` is not imported by the `Economy.lean` umbrella and so sits outside the default build target's reach. The module itself compiles and its theorems check individually (see below); re-attaching it to the umbrella is a pending one-line fix. The live numbers are in `/tmp/proof-report.json`.
+(`theorems`/`lemmas` count `^theorem `/`^lemma ` declarations; `definitions` counts `^def `/`^abbrev `/`^structure `/`^instance `/`^inductive `.) `Economy/EndToEndForecast.lean` is imported by the `Economy.lean` umbrella, and the verifier reports zero coverage gaps. The live numbers are in `/tmp/proof-report.json`.
 
 To check a specific theorem's axiom dependencies:
 
