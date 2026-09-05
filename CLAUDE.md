@@ -68,22 +68,11 @@ Plus three hardened failure-mode modules:
 - `RecessionShock` — Poisson regime switching. Keystone: `recession_expected_loss`.
 - `CapexBubble` — debt sustainability switch. Keystone: `bubble_pop_ghost_gdp_loss`.
 
-## How the blog footer is computed
+## Proof status
 
-The blog at tim.awkronos.com/economy carries a theorem/sorry/axiom/commit
-footer, hardcoded in `~/tim/web/economy/index.html`. **This is the one
-remaining hand-maintained value in this repository, and it has already
-drifted**: the footer text quoted here was `202 theorems, 0 sorry, 0 axioms,
-commit 54077a1` while the compiler reports a different theorem count (see the
-generated block in `README.md`). A hand-typed number that must track a system
-fact is correct the day it is written and wrong forever after.
-
-Until the footer is generated rather than typed, the rule is: after any corpus
-change, run `make proof`, then read the current values out of the generated
-block in `README.md` (`python3 ~/.claude/scripts/docstats-render.py write
-README.md`) and copy them into the HTML in the same commit. The durable fix is
-to render that footer from `/tmp/proof-report.json` at build time; do that
-instead of maintaining the copy by hand if you touch the web app.
+Do not copy theorem, sorry, axiom, build, or commit counts into this repository
+or the blog. Current status lives only in the `economy` row of
+`/tmp/proof-report.json`; `make proof` invokes the canonical estate refresh.
 
 ## Common tasks
 
