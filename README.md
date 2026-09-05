@@ -153,7 +153,6 @@ Economy/
   CapexBubble.lean             debt sustainability + Ghost GDP loss bound
   forecasts/                   output tables
 REFERENCES.md                  every empirical source
-AUDIT.md                       soundness + constants + triviality audits
 ```
 
 ## References
