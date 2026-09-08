@@ -1,10 +1,11 @@
 .PHONY: proof check build clean
 
 proof:
-	@~/.claude/scripts/proof-report-refresh.sh --oneline
+	@~/.claude/scripts/open-math.py verify --project economy --report /tmp/proof-report.json --sidecar /tmp/open_math.json
 
 check:
-	@cd /Users/schizodactyl/economy && lake env lean $(FILE) 2>&1 | tail -30
+	@test -n "$(FILE)" || { echo "Usage: make check FILE=path/to/File.lean"; exit 2; }
+	@cd /Users/schizodactyl/economy && lake env lean "$(FILE)"
 
 build:
 	@cd /Users/schizodactyl/economy && lake exe cache get && lake build Economy

@@ -71,8 +71,9 @@ Plus three hardened failure-mode modules:
 ## Proof status
 
 Do not copy theorem, sorry, axiom, build, or commit counts into this repository
-or the blog. Current status lives only in the `economy` row of
-`/tmp/proof-report.json`; `make proof` invokes the canonical estate refresh.
+or the blog. Current status and task selection live only in generated
+`/tmp/open_math.json`, bound to the exact native compiler report; `make proof`
+refreshes and checks it.
 
 ## Common tasks
 
