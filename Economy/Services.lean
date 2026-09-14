@@ -128,6 +128,84 @@ theorem baumol_nominal_share_rises (b : BaumolParams)
   rw [gt_iff_lt, div_lt_div_iff₀ hden2_pos hden1_pos]
   nlinarith
 
+
+/-! ### Carrier consumption — shares as genuine shares, strictness, drag at the carrier -/
+
+/-- THEOREM (share well-posedness): the pre-shock service share is a genuine
+    share, strictly between 0 and 1. The lower bound uses `serviceOutput_pos`
+    and the upper bound `exposedOutput_pos` — neither holds for an arbitrary
+    pair of reals, so these carry the carrier's economic content. -/
+theorem serviceShareBefore_pos (b : BaumolParams) : 0 < serviceShareBefore b := by
+  have hE := b.exposedOutput_pos
+  have hS := b.serviceOutput_pos
+  unfold serviceShareBefore
+  exact div_pos hS (by linarith)
+
+theorem serviceShareBefore_lt_one (b : BaumolParams) : serviceShareBefore b < 1 := by
+  have hE := b.exposedOutput_pos
+  have hS := b.serviceOutput_pos
+  unfold serviceShareBefore
+  rw [div_lt_one (by linarith)]
+  linarith
+
+/-- THEOREM: the post-shock service share is likewise a genuine share. -/
+theorem serviceShareAfter_pos (b : BaumolParams) : 0 < serviceShareAfter b := by
+  have hE := b.exposedOutput_pos
+  have hS := b.serviceOutput_pos
+  have hg := b.growth_nonneg
+  unfold serviceShareAfter
+  have h1g : 0 < 1 + b.exposedTFPGrowth := by linarith
+  exact div_pos hS (by nlinarith)
+
+theorem serviceShareAfter_lt_one (b : BaumolParams) : serviceShareAfter b < 1 := by
+  have hE := b.exposedOutput_pos
+  have hS := b.serviceOutput_pos
+  have hg := b.growth_nonneg
+  unfold serviceShareAfter
+  have hEg : 0 < b.exposedOutput * (1 + b.exposedTFPGrowth) := by nlinarith
+  rw [div_lt_one (by nlinarith)]
+  nlinarith
+
+/-- THEOREM (strict real-output dual): with STRICTLY positive exposed growth
+    the service share falls strictly. The carrier only assumes `0 <= g`, and at
+    `g = 0` the shares coincide (`serviceShareAfter_eq_of_growth_zero`), so the
+    side condition is exactly the content boundary of the strict statement. -/
+theorem baumol_service_share_falls_strict (b : BaumolParams)
+    (hg : 0 < b.exposedTFPGrowth) :
+    serviceShareAfter b < serviceShareBefore b := by
+  have hE := b.exposedOutput_pos
+  have hS := b.serviceOutput_pos
+  unfold serviceShareAfter serviceShareBefore
+  have hden1 : 0 < b.exposedOutput * (1 + b.exposedTFPGrowth) + b.serviceOutput := by
+    nlinarith
+  rw [div_lt_div_iff₀ hden1 (by linarith)]
+  have hSE : 0 < b.serviceOutput * b.exposedOutput := mul_pos hS hE
+  have hSEg : 0 < b.serviceOutput * b.exposedOutput * b.exposedTFPGrowth :=
+    mul_pos hSE hg
+  nlinarith
+
+/-- THEOREM (boundary of strictness): at zero exposed growth the share does
+    not move, so `0 < g` in `baumol_service_share_falls_strict` is tight. -/
+theorem serviceShareAfter_eq_of_growth_zero (b : BaumolParams)
+    (hg : b.exposedTFPGrowth = 0) : serviceShareAfter b = serviceShareBefore b := by
+  unfold serviceShareAfter serviceShareBefore
+  rw [hg]
+  ring
+
+/-- THEOREM (Baumol-Bowen drag at the carrier): taking the progressive-sector
+    share to be the exposed output share `1 - serviceShareBefore b`, aggregate
+    growth is bounded by — and since every carrier instance has a STRICTLY
+    positive service share, always strictly below — progressive growth. This is
+    the permanent-drag statement: it consumes `serviceShareBefore` and
+    `aggregateGrowth` together. -/
+theorem baumol_drag_serviceShare {b : BaumolParams} {gP : ℝ} (hgP : 0 ≤ gP) :
+    aggregateGrowth (1 - serviceShareBefore b) gP ≤ gP :=
+  baumol_bowen_drag (by linarith [serviceShareBefore_pos b]) hgP
+
+theorem baumol_drag_serviceShare_strict {b : BaumolParams} {gP : ℝ} (hgP : 0 < gP) :
+    aggregateGrowth (1 - serviceShareBefore b) gP < gP :=
+  baumol_bowen_drag_strict (by linarith [serviceShareBefore_pos b]) hgP
+
 end
 
 end Economy

@@ -25,7 +25,7 @@
     estimated $400B aggregate hyperscaler debt against $1.7T market cap.
   * BEA NIPA: maintenance capex ≈ 1.5% annual depreciation rate.
 
-  TIER: THEOREM for all five results below.
+  TIER: THEOREM for all results below.
 -/
 import Economy.FinanceRealCoupling
 import Economy.Calibration
@@ -220,6 +220,71 @@ theorem capexBEA_pop_loss_monthly :
     popGhostGDPLoss capexBEA2026 (6 / 10) = 15 / 10000 := by
   unfold popGhostGDPLoss capexBEA2026
   norm_num
+
+/-! ### Theorem 6 — debt-service capacity threshold -/
+
+namespace CapexParams
+
+/-- Debt-service capacity ("the bond-market stop rate"): the interest rate at
+    which debt service exactly equals cash-flow growth. -/
+def criticalRate (c : CapexParams) : ℝ := c.cashFlowGrowth / c.debtStack
+
+/-- THEOREM (sustainability threshold form): for a strictly positive debt
+    stack, the sustainability predicate `CapexParams.sustainable` holds
+    exactly when the interest rate sits at or below debt-service capacity.
+    The side condition `0 < debtStack` is required: the carrier allows
+    `debtStack = 0`, where `criticalRate = 0` (division by zero) yet debt
+    service is also zero — the threshold reading is false there. -/
+theorem sustainable_iff_below_critical (c : CapexParams) (hds : 0 < c.debtStack) :
+    c.sustainable ↔ c.interestRate ≤ criticalRate c := by
+  unfold CapexParams.sustainable CapexParams.debtService criticalRate
+  rw [mul_comm, le_div_iff₀ hds]
+
+/-- THEOREM (threshold switch, hyperscaler side): a rate at or below capacity
+    keeps the effective capital growth at the hyperscaler regime. Consumes
+    `sustainable` through the switch theorem. -/
+theorem effectiveGK_hyper_below_critical (c : CapexParams) (hds : 0 < c.debtStack)
+    (hr : c.interestRate ≤ criticalRate c) :
+    c.effectiveGK = c.gK_hyper :=
+  debt_sustainability_sufficient c ((sustainable_iff_below_critical c hds).mpr hr)
+
+/-- THEOREM (threshold switch, collapse side): strictly above capacity the
+    growth rate collapses to maintenance. Needs `0 < debtStack` for the same
+    division-by-zero reason as `sustainable_iff_below_critical`. -/
+theorem effectiveGK_maint_above_critical (c : CapexParams) (hds : 0 < c.debtStack)
+    (hr : criticalRate c < c.interestRate) :
+    c.effectiveGK = c.gK_maintenance := by
+  unfold CapexParams.criticalRate at hr
+  have h1 : c.cashFlowGrowth < c.interestRate * c.debtStack := (div_lt_iff₀ hds).mp hr
+  rw [mul_comm] at h1
+  exact debt_failure_collapses_to_maintenance c h1
+
+/-- THEOREM (BEA 2026 capacity): debt-service capacity on the BEA 2026 stack
+    ($0.4T at growth 0.5%/mo) is 1.25%/mo — about 15%/yr. Today's 0.5%/mo
+    sits strictly below it: the regime switch is driven by a 2.5x rate move,
+    stated as a theorem rather than prose. -/
+theorem capexBEA_criticalRate : CapexParams.criticalRate capexBEA2026 = 125 / 10000 := by
+  unfold CapexParams.criticalRate capexBEA2026
+  norm_num
+
+theorem capexBEA_headroom :
+    capexBEA2026.interestRate < CapexParams.criticalRate capexBEA2026 := by
+  rw [capexBEA_criticalRate]
+  unfold capexBEA2026
+  norm_num
+
+/-- THEOREM (BEA 2026 effective regime): the threshold machinery puts today's
+    effective capital growth at the hyperscaler value 0.5%/mo. -/
+theorem capexBEA_effectiveGK : capexBEA2026.effectiveGK = 5 / 1000 := by
+  have hdebt : 0 < capexBEA2026.debtStack := by
+    unfold capexBEA2026
+    norm_num
+  rw [CapexParams.effectiveGK_hyper_below_critical capexBEA2026 hdebt
+    capexBEA_headroom.le]
+  unfold capexBEA2026
+  rfl
+
+end CapexParams
 
 end
 

@@ -27,6 +27,7 @@
   which is not derived from `CobbDouglas.Y` in this file.
 -/
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
+import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Tactic
 
@@ -95,6 +96,50 @@ theorem Y_crs (p : CobbDouglas) (lam : ℝ) (hlam : 0 < lam) :
     _ = p.A * (p.K ^ (1 - p.α) * p.L ^ p.α) * lam := by rw [hprod]
     _ = lam * (p.A * p.K ^ (1 - p.α) * p.L ^ p.α) := by ring
 
+/-- THEOREM: output is strictly positive once both inputs are strictly
+    positive (the carrier only gives `K ≥ 0`, `L ≥ 0`). -/
+theorem Y_pos (p : CobbDouglas) (hK : 0 < p.K) (hL : 0 < p.L) : 0 < p.Y := by
+  unfold Y
+  exact mul_pos (mul_pos p.A_pos (Real.rpow_pos_of_pos hK _))
+    (Real.rpow_pos_of_pos hL _)
+
+/-- Output viewed as a function of labor, capital fixed. -/
+noncomputable def outputOfLabor (p : CobbDouglas) (ℓ : ℝ) : ℝ :=
+  p.A * p.K ^ (1 - p.α) * ℓ ^ p.α
+
+/-- Output viewed as a function of capital, labor fixed. -/
+noncomputable def outputOfCapital (p : CobbDouglas) (κ : ℝ) : ℝ :=
+  p.A * κ ^ (1 - p.α) * p.L ^ p.α
+
+/-- THEOREM (marginal product of labor): for the Cobb-Douglas production
+    function, `∂Y/∂L = α · Y/L`. This is differentiation of `rpow`, not an
+    assumption: it is what licenses reading `w = α·Y/L` as the competitive wage
+    in `ofCompetitivePrices`. -/
+theorem hasDerivAt_outputOfLabor (p : CobbDouglas) (hL : 0 < p.L) :
+    HasDerivAt p.outputOfLabor (p.α * p.Y / p.L) p.L := by
+  have h : HasDerivAt (fun ℓ : ℝ => ℓ ^ p.α) (p.α * p.L ^ (p.α - 1)) p.L :=
+    Real.hasDerivAt_rpow_const (Or.inl hL.ne')
+  have h2 : HasDerivAt (fun y : ℝ => p.A * p.K ^ (1 - p.α) * y ^ p.α)
+      (p.A * p.K ^ (1 - p.α) * (p.α * p.L ^ (p.α - 1))) p.L :=
+    h.const_mul (p.A * p.K ^ (1 - p.α))
+  refine h2.congr_deriv ?_
+  unfold Y
+  rw [Real.rpow_sub_one hL.ne']
+  field_simp
+
+/-- THEOREM (marginal product of capital): `∂Y/∂K = (1-α) · Y/K`. -/
+theorem hasDerivAt_outputOfCapital (p : CobbDouglas) (hK : 0 < p.K) :
+    HasDerivAt p.outputOfCapital ((1 - p.α) * p.Y / p.K) p.K := by
+  have h : HasDerivAt (fun κ : ℝ => κ ^ (1 - p.α)) ((1 - p.α) * p.K ^ (1 - p.α - 1)) p.K :=
+    Real.hasDerivAt_rpow_const (Or.inl hK.ne')
+  have h2 : HasDerivAt (fun y : ℝ => p.A * y ^ (1 - p.α) * p.L ^ p.α)
+      (p.A * ((1 - p.α) * p.K ^ (1 - p.α - 1)) * p.L ^ p.α) p.K :=
+    (h.const_mul p.A).mul_const (p.L ^ p.α)
+  refine h2.congr_deriv ?_
+  unfold Y
+  rw [Real.rpow_sub_one hK.ne']
+  field_simp
+
 end CobbDouglas
 
 /-- Factor payments in a competitive Cobb-Douglas economy. Given the first-order
@@ -135,6 +180,57 @@ theorem capital_share_equals_one_minus_alpha (f : FactorIncome) (hY : f.Y ≠ 0)
   field_simp
 
 end FactorIncome
+
+/-! ### Competitive factor income DERIVED from Cobb-Douglas -/
+
+/-- Competitive factor payments for a Cobb-Douglas economy with strictly
+    positive inputs: pay each factor its marginal product
+    (`CobbDouglas.hasDerivAt_outputOfLabor` / `...Capital`). The
+    `FactorIncome` fields `foc_labor` / `foc_capital` are then DERIVED, not
+    assumed: this construction is what shows the first-order-condition bundle
+    is inhabited by genuine production-function data rather than being a
+    wrapper that assumes its conclusion. -/
+noncomputable def ofCompetitivePrices (p : CobbDouglas) (hK : 0 < p.K) (hL : 0 < p.L) :
+    FactorIncome where
+  Y := p.Y
+  w := p.α * p.Y / p.L
+  r := (1 - p.α) * p.Y / p.K
+  L := p.L
+  K := p.K
+  α := p.α
+  foc_labor := by field_simp [hL.ne']
+  foc_capital := by field_simp [hK.ne']
+
+/-- THEOREM (Euler for Cobb-Douglas, consumed): under competitive pricing,
+    labor income plus capital income exhausts output — obtained by applying
+    `FactorIncome.factor_income_exhausts` to the derived instance. -/
+theorem cobbDouglas_factor_income_exhausts (p : CobbDouglas)
+    (hK : 0 < p.K) (hL : 0 < p.L) :
+    let f := ofCompetitivePrices p hK hL
+    f.w * f.L + f.r * f.K = f.Y :=
+  FactorIncome.factor_income_exhausts _
+
+/-- THEOREM (labor share = α, consumed): the competitive labor share of a
+    Cobb-Douglas economy is exactly `α` — `FactorIncome.labor_share_equals_alpha`
+    applied at the derived instance; strict positivity of `Y` comes from
+    `CobbDouglas.Y_pos`. -/
+theorem cobbDouglas_labor_share (p : CobbDouglas) (hK : 0 < p.K) (hL : 0 < p.L) :
+    let f := ofCompetitivePrices p hK hL
+    f.w * f.L / f.Y = f.α :=
+  FactorIncome.labor_share_equals_alpha _ (CobbDouglas.Y_pos p hK hL).ne'
+
+/-- THEOREM (the wage IS the marginal product): `deriv (outputOfLabor p) p.L`
+    equals the `w` field of the constructed `FactorIncome` — the bridge that
+    makes `ofCompetitivePrices` an economic construction rather than an
+    algebraic relabeling. -/
+theorem cobbDouglas_w_is_mpl (p : CobbDouglas) (hK : 0 < p.K) (hL : 0 < p.L) :
+    deriv p.outputOfLabor p.L = (ofCompetitivePrices p hK hL).w :=
+  (p.hasDerivAt_outputOfLabor hL).deriv
+
+/-- THEOREM (the rental rate IS the marginal product). -/
+theorem cobbDouglas_r_is_mpk (p : CobbDouglas) (hK : 0 < p.K) (hL : 0 < p.L) :
+    deriv p.outputOfCapital p.K = (ofCompetitivePrices p hK hL).r :=
+  (p.hasDerivAt_outputOfCapital hK).deriv
 
 /-- Solow-residual growth accounting.
     Given log-differences (`g` = growth rate) of TFP, capital, labor, output,
