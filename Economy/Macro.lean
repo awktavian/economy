@@ -22,13 +22,17 @@
 
   TIER: THEOREM for identities and structural inequalities; FRAMEWORK for the
   Cobb-Douglas functional form itself (which is a modeling choice, not a theorem).
-  The `SolowGrowth` results are CONDITIONAL THEOREMS: they are proved relative
-  to the assumed structure field `solow_id` (the log-linearized Solow identity),
-  which is not derived from `CobbDouglas.Y` in this file.
+  The `SolowGrowth` results are proved relative to the structure field
+  `solow_id`. For `CobbDouglas` output paths the field is DERIVED, not assumed
+  (`SolowGrowth.ofCobbDouglasPaths`): the log-growth identity is exact for
+  instantaneous (log-derivative) rates — no linearization remainder. It is
+  approximate only when log rates are replaced by simple relative changes,
+  which is not formalized here.
 -/
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Analysis.SpecialFunctions.Log.Deriv
 import Mathlib.Tactic
 
 namespace Economy
@@ -139,6 +143,12 @@ theorem hasDerivAt_outputOfCapital (p : CobbDouglas) (hK : 0 < p.K) :
   unfold Y
   rw [Real.rpow_sub_one hK.ne']
   field_simp
+
+/-- The Cobb-Douglas output law as a FUNCTION of factor paths:
+    `(pathsOutput p A K L) s = A s · K s ^ (1-α) · L s ^ α`, with the labor
+    share taken from the carrier `p`. At constant paths it is `CobbDouglas.Y`. -/
+noncomputable def pathsOutput (p : CobbDouglas) (A K L : ℝ → ℝ) : ℝ → ℝ :=
+  fun s => A s * K s ^ (1 - p.α) * L s ^ p.α
 
 end CobbDouglas
 
@@ -279,6 +289,134 @@ theorem ghost_gdp_nonneg (s : SolowGrowth)
   have h1 : 0 ≤ 1 - s.α := by linarith
   have h2 : 0 ≤ (1 - s.α) * s.gK := mul_nonneg h1 hK
   linarith
+
+end SolowGrowth
+
+/-! ### Solow identity DERIVED from Cobb-Douglas factor paths -/
+
+namespace SolowGrowth
+
+/-- THEOREM (log-growth decomposition of Cobb-Douglas, exact): if the output
+    path is the CD law `CobbDouglas.pathsOutput p A K L`, and the factor paths
+    are differentiable at `t` with strictly positive values there, then the
+    log-derivative (instantaneous growth) of output splits exactly:
+    `d/dt log Y = A'/A + (1-α)·K'/K + α·L'/L`.
+
+    Exactness note (truth-check): passing to logarithms converts the CD
+    PRODUCT into a SUM pointwise (`Real.log_mul`, `Real.log_rpow`), so
+    differentiating loses nothing — this is NOT a first-order linearization.
+    The usual "≈" of growth accounting appears only when the log-rates
+    `A'/A` are replaced by simple relative changes; that replacement is
+    unformalized here. -/
+theorem cobbDouglas_growth_identity (p : CobbDouglas) (A K L Y : ℝ → ℝ) (t : ℝ)
+    (hY : ∀ s, Y s = p.pathsOutput A K L s)
+    (hA0 : 0 < A t) (hK0 : 0 < K t) (hL0 : 0 < L t)
+    (dA : DifferentiableAt ℝ A t) (dK : DifferentiableAt ℝ K t)
+    (dL : DifferentiableAt ℝ L t) :
+    HasDerivAt (fun s => Real.log (Y s))
+      (deriv A t / A t + (1 - p.α) * (deriv K t / K t) + p.α * (deriv L t / L t)) t := by
+  have hAn : ∀ᶠ s in nhds t, 0 < A s := dA.continuousAt.eventually (isOpen_Ioi.mem_nhds hA0)
+  have hKn : ∀ᶠ s in nhds t, 0 < K s := dK.continuousAt.eventually (isOpen_Ioi.mem_nhds hK0)
+  have hLn : ∀ᶠ s in nhds t, 0 < L s := dL.continuousAt.eventually (isOpen_Ioi.mem_nhds hL0)
+  have hYt : 0 < Y t := by
+    rw [hY t, CobbDouglas.pathsOutput]
+    exact mul_pos (mul_pos hA0 (Real.rpow_pos_of_pos hK0 _)) (Real.rpow_pos_of_pos hL0 _)
+  have hlog : (fun s => Real.log (Y s)) =ᶠ[nhds t]
+      fun s => Real.log (A s) + (1 - p.α) * Real.log (K s) + p.α * Real.log (L s) := by
+    filter_upwards [hAn, hKn, hLn] with s hA hK hL
+    have h2 : 0 < K s ^ (1 - p.α) * L s ^ p.α :=
+      mul_pos (Real.rpow_pos_of_pos hK _) (Real.rpow_pos_of_pos hL _)
+    calc Real.log (Y s)
+        = Real.log (A s * (K s ^ (1 - p.α) * L s ^ p.α)) := by
+            rw [hY s, CobbDouglas.pathsOutput, (mul_assoc _ _ _).symm]
+      _ = Real.log (A s) + Real.log (K s ^ (1 - p.α) * L s ^ p.α) :=
+            Real.log_mul (ne_of_gt hA) (ne_of_gt h2)
+      _ = Real.log (A s) + (Real.log (K s ^ (1 - p.α)) + Real.log (L s ^ p.α)) := by
+            rw [Real.log_mul (ne_of_gt (Real.rpow_pos_of_pos hK _))
+              (ne_of_gt (Real.rpow_pos_of_pos hL _))]
+      _ = (Real.log (A s) + (1 - p.α) * Real.log (K s)) + p.α * Real.log (L s) := by
+            rw [Real.log_rpow hK _, Real.log_rpow hL _, ← add_assoc]
+  have dY : DifferentiableAt ℝ Y t := by
+    have hcd : DifferentiableAt ℝ (p.pathsOutput A K L) t := by
+      unfold CobbDouglas.pathsOutput
+      refine DifferentiableAt.mul (DifferentiableAt.mul dA ?_) ?_
+      · exact ((Real.hasDerivAt_rpow_const (Or.inl (ne_of_gt hK0))).comp t dK.hasDerivAt).differentiableAt
+      · exact ((Real.hasDerivAt_rpow_const (Or.inl (ne_of_gt hL0))).comp t dL.hasDerivAt).differentiableAt
+    exact hcd.congr_of_eventuallyEq
+      (Filter.eventually_of_mem Filter.univ_mem (fun s _ => hY s))
+  have hA' : HasDerivAt (fun s => Real.log (A s)) (deriv A t / A t) t :=
+    (dA.hasDerivAt).log (ne_of_gt hA0)
+  have hK' : HasDerivAt (fun s => Real.log (K s)) (deriv K t / K t) t :=
+    (dK.hasDerivAt).log (ne_of_gt hK0)
+  have hL' : HasDerivAt (fun s => Real.log (L s)) (deriv L t / L t) t :=
+    (dL.hasDerivAt).log (ne_of_gt hL0)
+  have hrhs : HasDerivAt
+      (fun s => Real.log (A s) + (1 - p.α) * Real.log (K s) + p.α * Real.log (L s))
+      (deriv A t / A t + (1 - p.α) * (deriv K t / K t) + p.α * (deriv L t / L t)) t :=
+    (hA'.add (hK'.const_mul (1 - p.α))).add (hL'.const_mul p.α)
+  exact hrhs.congr_of_eventuallyEq hlog
+
+/-- A `SolowGrowth` instance produced from Cobb-Douglas factor paths: the four
+    growth rates are the instantaneous log-derivatives of the factor and output
+    paths at `t`, and the assumed structure field `solow_id` is DERIVED from
+    `cobbDouglas_growth_identity` rather than supplied. `gY` is deliberately
+    defined as the quotient `deriv Y t / Y t`, not as the sum, so the identity
+    carries proof content. No bounds on `p.α` are needed: the field
+    `SolowGrowth.α : ℝ` is unconstrained. -/
+noncomputable def ofCobbDouglasPaths (p : CobbDouglas) (A K L Y : ℝ → ℝ) (t : ℝ)
+    (hY : ∀ s, Y s = p.pathsOutput A K L s)
+    (hA0 : 0 < A t) (hK0 : 0 < K t) (hL0 : 0 < L t)
+    (dA : DifferentiableAt ℝ A t) (dK : DifferentiableAt ℝ K t)
+    (dL : DifferentiableAt ℝ L t) : SolowGrowth where
+  gY := deriv Y t / Y t
+  gA := deriv A t / A t
+  gK := deriv K t / K t
+  gL := deriv L t / L t
+  α := p.α
+  solow_id := by
+    have hYt : 0 < Y t := by
+      rw [hY t, CobbDouglas.pathsOutput]
+      exact mul_pos (mul_pos hA0 (Real.rpow_pos_of_pos hK0 _)) (Real.rpow_pos_of_pos hL0 _)
+    have dY : DifferentiableAt ℝ Y t := by
+      have hcd : DifferentiableAt ℝ (p.pathsOutput A K L) t := by
+        unfold CobbDouglas.pathsOutput
+        refine DifferentiableAt.mul (DifferentiableAt.mul dA ?_) ?_
+        · exact ((Real.hasDerivAt_rpow_const (Or.inl (ne_of_gt hK0))).comp t
+            dK.hasDerivAt).differentiableAt
+        · exact ((Real.hasDerivAt_rpow_const (Or.inl (ne_of_gt hL0))).comp t
+            dL.hasDerivAt).differentiableAt
+      exact hcd.congr_of_eventuallyEq
+        (Filter.eventually_of_mem Filter.univ_mem (fun s _ => hY s))
+    exact HasDerivAt.unique ((dY.hasDerivAt).log (ne_of_gt hYt))
+      (cobbDouglas_growth_identity p A K L Y t hY hA0 hK0 hL0 dA dK dL)
+
+/-- CONSUMPTION 1: the TFP-residual formula `SolowGrowth.solow_residual`
+    applied to the DERIVED instance — TFP growth equals the output log-rate
+    minus factor-share contributions, now for actual CD paths, no assumption. -/
+theorem solow_residual_ofCobbDouglasPaths (p : CobbDouglas) (A K L Y : ℝ → ℝ) (t : ℝ)
+    (hY : ∀ s, Y s = p.pathsOutput A K L s)
+    (hA0 : 0 < A t) (hK0 : 0 < K t) (hL0 : 0 < L t)
+    (dA : DifferentiableAt ℝ A t) (dK : DifferentiableAt ℝ K t)
+    (dL : DifferentiableAt ℝ L t) :
+    deriv A t / A t = deriv Y t / Y t
+      - (1 - p.α) * (deriv K t / K t) - p.α * (deriv L t / L t) := by
+  exact solow_residual (ofCobbDouglasPaths p A K L Y t hY hA0 hK0 hL0 dA dK dL)
+
+/-- CONSUMPTION 2: the ghost-GDP corollary `SolowGrowth.ghost_gdp_constant_labor`
+    at the DERIVED instance: if the labor path is stationary at `t`
+    (`deriv L t = 0`), the output log-rate equals TFP log-rate plus the
+    capital-share term — with `solow_id` derived, not assumed. -/
+theorem ghost_gdp_ofCobbDouglasPaths (p : CobbDouglas) (A K L Y : ℝ → ℝ) (t : ℝ)
+    (hY : ∀ s, Y s = p.pathsOutput A K L s)
+    (hA0 : 0 < A t) (hK0 : 0 < K t) (hL0 : 0 < L t)
+    (dA : DifferentiableAt ℝ A t) (dK : DifferentiableAt ℝ K t)
+    (dL : DifferentiableAt ℝ L t) (hstat : deriv L t = 0) :
+    deriv Y t / Y t = deriv A t / A t + (1 - p.α) * (deriv K t / K t) := by
+  have hgL : (ofCobbDouglasPaths p A K L Y t hY hA0 hK0 hL0 dA dK dL).gL = 0 := by
+    show deriv L t / L t = 0
+    rw [hstat]
+    exact zero_div _
+  exact ghost_gdp_constant_labor _ hgL
 
 end SolowGrowth
 
