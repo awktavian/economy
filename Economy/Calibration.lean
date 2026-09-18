@@ -371,9 +371,9 @@ theorem gdp_antitone_in_H_max {H Hmax Hmax' : ℝ}
   exact min_le_min (le_refl 1) hmax_le
 
 /-- **S3. GDP monotone in `α` under the Ghost-GDP channel, conditional on
-    `gK ≥ gA`**: if capital growth dominates TFP growth, then lowering α
-    (raising the capital-share exponent `1 − α`) raises the Ghost-GDP
-    growth rate `gA + (1−α)·gK`. Sign depends on the conditional; we
+    `gK ≥ 0`**: if capital growth is nonnegative, then lowering α
+    (raising the capital-share exponent `1 − α`) weakly raises the Ghost-GDP
+    growth rate `gA + (1−α)·gK`. Sign depends on `gK`; we
     prove the conditional directly. -/
 theorem gdp_mono_in_α {gA α α' gK : ℝ}
     (hgK : 0 ≤ gK) (hα_le : α' ≤ α) :

@@ -19,8 +19,9 @@
     Review of Economic Studies 45(3): 511–518.
 
   TIER: THEOREM for algebraic identities (log-decomposition, weight sum,
-  exposure share bounds); CONJECTURE for the differentiable-envelope form
-  of Hulten (stated with sorry + citation to Hulten 1978).
+  exposure share bounds); the differentiable-envelope form
+  of Hulten is not formalized here (not stated at all; the Hulten 1978
+  citation is the upstream result).
 -/
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Tactic
@@ -107,8 +108,8 @@ theorem exposureShare_mono {S T : Finset (Fin n)} (h : S ⊆ T) :
     `log Y' - log Y = Σ αᵢ (log A'_i - log A_i)`.
 
     This is the DISCRETE version of Hulten's theorem (the differentiable version
-    requires calculus machinery we don't develop here; that's stated as a separate
-    conjecture below). The discrete version is the one actually used in growth
+    requires calculus machinery we don't develop here and is not stated in this
+    file). The discrete version is the one actually used in growth
     accounting. -/
 theorem hulten_discrete (E' : TaskEconomy n)
     (hψ : E'.ψ = E.ψ) (hk : E'.k = E.k) (hℓ : E'.ℓ = E.ℓ)
