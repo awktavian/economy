@@ -3,6 +3,8 @@
   Partial-monotonicity lemmas — how the structural bound reacts to each
   parameter individually. Useful for scenario analysis and for anchoring
   empirical claims in the literature.
+
+  TIER: THEOREM for all results in this file.
 -/
 import Economy.Productivity
 import Economy.GDP
