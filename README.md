@@ -108,7 +108,7 @@ Every empirical parameter is in `Economy/Calibration.lean`. The three canonical 
 - `β_slope` — METR regression slope in nats/month (current fast: log 2 / 4)
 - `gK` — capital growth rate per month (hyperscaler-driven: 0.003)
 - `costSavings` — task cost-savings coefficient per unit exposure (0.175; the Goldman-corner value — 0.40 exposure × 0.175 = the ~7% anchor — while the Acemoglu corner uses 0.033)
-- `nonSubShare` — non-AI-substitutable labor fraction (BLS + ILO: 0.25)
+- `nonSubShare` — non-AI-substitutable labor fraction (BLS Occupational Employment Statistics 2026: 0.25)
 - `recessionHazard` — monthly recession hazard (NBER post-1950: 0.015)
 - `debtStack` — hyperscaler debt (~$400B)
 
