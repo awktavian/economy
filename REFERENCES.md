@@ -1,6 +1,6 @@
 # References — `economy`
 
-All empirical parameters in the Lean formalization come from the five sources below. Numbers are quoted verbatim; no number in the Lean files exceeds what a source directly states.
+All empirical anchors in the Lean formalization are attributed to the sources below — the five primary sources, the theoretical references in §6, and the dated anchor tables appended at the end. Anchor numbers are quoted as their dated source states them. The sensitivity corners — `calPessimistic` (α 0.55, `nonSubShare` 0.20, hazard 0.025, duration 14 mo, shock 0.004, debt 0.6T, ψ_k 0.85, m 0.95, costSavings 0.25) and the low/high envelopes in `Economy/Bounds.lean` and `Economy/Empirical.lean` — are declared in their Lean docstrings as chosen-plausible bounds, not source point estimates.
 
 ## 1. Claude Mythos Preview System Card (Anthropic, 2026-04-07)
 
@@ -72,3 +72,20 @@ These are cited as the HIGH end of the sensitivity envelope in `Economy/Bounds.l
 | METR AI time-horizon doubling (2024-25) | ~4 months | METR TH1.1 — https://metr.org/blog/2026-1-29-time-horizon-1-1/ |
 | METR baseline doubling (2019-25) | ~7 months | METR |
 | Anthropic Mythos SWE-bench Verified | 93.9% (2026-04-07) | Claude Mythos System Card |
+
+## 2026-09-18 completion rows (W11-D5)
+
+Anchors already cited by Lean docstrings that lacked a row above:
+
+| Datum | Value | Source |
+|---|---|---|
+| US labor share α | 0.60 (`calBEA2026` / `calBaseline`) | BEA NIPA — cited in `Economy/Calibration.lean` |
+| Non-AI-substitutable labor share | ≈ 0.25 of ~158M payroll (childcare 1.5%, nursing 2.0%, skilled trades 4.6%, personal care 2.8%) | BLS Occupational Employment Statistics 2026 — cited in `Economy/JobSwapping.lean` |
+| Recession hazard / duration / monthly shock | 0.015/mo · 10 mo · 0.0025 | NBER post-1950 recession chronology — cited in `Economy/Calibration.lean`, `Economy/RecessionShock.lean` |
+| Sahm-rule threshold | 3-mo average ≥ 0.5pp above trailing 12-mo minimum | Sahm (2019), "Direct Stimulus Payments to Individuals", Federal Reserve — cited in `Economy/LaborMarketDynamics.lean` |
+| Top-decile capital ownership ψ_k | ≈ 0.77 | Piketty–Zucman distributional accounts — cited in `Economy/Calibration.lean` |
+| Hyperscaler debt stack | ~$400B against ~$1.7T market cap (Jan 2026) | MUFG / CreditSights debt-stack analysis — cited in `Economy/CapexBubble.lean` |
+| Maintenance capital growth | ≈ 1.5%/yr depreciation rate | BEA NIPA — cited in `Economy/CapexBubble.lean` |
+| MPC m | ≈ 0.9 | BEA personal income/outlays — cited in `Economy/Calibration.lean` |
+| Cost-savings coefficient c (baseline) | 0.175 — the Goldman-consistent value: 0.40 exposure × 0.175 = 7% | derived from §3/§5; corners 0.033 (Acemoglu, V1) and 0.250 (pessimistic) |
+| Saturation horizon H_max | 12 months — modeling choice in the AEI exposure context (§2), pinned in `Economy/Calibration.lean` | choice, not a source point estimate |
