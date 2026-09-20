@@ -100,4 +100,21 @@ theorem ghost_gdp_dominates_iff
   · intro h; linarith
   · intro h; linarith
 
+/-- THEOREM (displacement comparative statics): holding productivity, capital,
+    labor share, the MPC, wages, and output fixed, a strictly larger displaced
+    labor quantity strictly lowers `netOutputGrowth` whenever the MPC, wage,
+    and output denominator are positive. This isolates the model's monotone
+    displacement channel without interpreting `ΔL` as an empirical forecast. -/
+theorem more_displacement_reduces_growth
+    (gA α gK m w ΔL₁ ΔL₂ Y : ℝ)
+    (hm : 0 < m) (hw : 0 < w) (hY : 0 < Y) (hΔ : ΔL₁ < ΔL₂) :
+    netOutputGrowth gA α gK m w ΔL₂ Y <
+      netOutputGrowth gA α gK m w ΔL₁ Y := by
+  have hweighted : w * ΔL₁ < w * ΔL₂ :=
+    mul_lt_mul_of_pos_left hΔ hw
+  have hdrag : w * ΔL₁ / Y < w * ΔL₂ / Y :=
+    (div_lt_div_iff_of_pos_right hY).mpr hweighted
+  unfold netOutputGrowth
+  nlinarith [mul_lt_mul_of_pos_left hdrag hm]
+
 end Economy
