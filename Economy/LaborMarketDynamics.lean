@@ -75,6 +75,35 @@ structure TwoCohort where
 
 namespace TwoCohort
 
+/-- Finding rate of a cohort: baseline hiring `f₀ > 0` plus a reinstatement
+    channel `κᵣ · r` — workers reinstated to new tasks are rehired faster. -/
+noncomputable def cohortFinding (f₀ κᵣ r : ℝ) : ℝ := f₀ + κᵣ * r
+
+/-- THEOREM (two-cohort comparative statics — the `TwoCohort` consumer): if
+    entrants separate at least as often as the experienced cohort
+    (`sep_exp ≤ sep_ent`) and are reinstated no faster (`r_ent ≤ r_exp`),
+    entrant steady-state unemployment is weakly above the experienced
+    cohort's. Every field of the carrier is consumed: `sep_exp_nn` /
+    `sep_ent_nn` certify the denominators of `steadyStateU`, `r_exp_nn` /
+    `r_ent_nn` certify the finding-rate channels, and `hsep` / `hr` are the
+    live ordering hypotheses. This wires `TwoCohort` into the existing
+    `MatchingModel` steady-state machinery. -/
+theorem two_cohort_gap (T : TwoCohort) {f₀ κᵣ : ℝ} (hf₀ : 0 < f₀) (hκᵣ : 0 ≤ κᵣ)
+    (hsep : T.sep_exp ≤ T.sep_ent) (hr : T.r_ent ≤ T.r_exp) :
+    steadyStateU T.sep_exp (cohortFinding f₀ κᵣ T.r_exp)
+      ≤ steadyStateU T.sep_ent (cohortFinding f₀ κᵣ T.r_ent) := by
+  unfold cohortFinding steadyStateU
+  have hfe : 0 ≤ f₀ + κᵣ * T.r_ent := by nlinarith [mul_nonneg hκᵣ T.r_ent_nn]
+  have hfer : f₀ + κᵣ * T.r_ent ≤ f₀ + κᵣ * T.r_exp := by
+    nlinarith [mul_le_mul_of_nonneg_left hr hκᵣ]
+  have key : T.sep_exp * (f₀ + κᵣ * T.r_ent) ≤ T.sep_ent * (f₀ + κᵣ * T.r_exp) := by
+    nlinarith [mul_le_mul_of_nonneg_right hsep hfe,
+      mul_le_mul_of_nonneg_left hfer T.sep_ent_nn]
+  have h1 : 0 < T.sep_exp + (f₀ + κᵣ * T.r_exp) := by nlinarith [T.sep_exp_nn, T.r_exp_nn, hf₀, hκᵣ]
+  have h2 : 0 < T.sep_ent + (f₀ + κᵣ * T.r_ent) := by nlinarith [T.sep_ent_nn, T.r_ent_nn, hf₀, hκᵣ]
+  rw [div_le_div_iff₀ h1 h2]
+  nlinarith [key]
+
 end TwoCohort
 
 end Economy

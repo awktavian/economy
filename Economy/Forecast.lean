@@ -19,6 +19,7 @@ import Economy.IntelligenceTrajectory
 import Economy.Macro
 import Economy.Welfare
 import Mathlib.Tactic
+import Mathlib.Analysis.Complex.ExponentialBounds
 
 namespace Economy
 
@@ -125,15 +126,104 @@ structure Reinstatement where
   r_nn : 0 ≤ r
   r_le_one : r ≤ 1
 
-/-- THEOREM (welfare-GDP divergence witness): there exist a scenario and a
-    reinstatement parameter with r = 0 such that at some time t > 0, the
-    welfare change is strictly negative even though logGDPDeviation > 0.
-    We use the `welfare_can_fall_with_gdp_rise` witness from Welfare.lean,
-    parameterized by time through a concrete scenario. -/
-theorem welfare_trajectory_can_diverge_from_gdp :
-    ∃ (Y Y' lam lam' : ℝ), 0 < Y ∧ 0 < Y' ∧ 0 < lam ∧ 0 < lam'
-      ∧ Y < Y' ∧ welfareDelta (lam * Y) (lam' * Y') < 0 :=
-  welfare_can_fall_with_gdp_rise
+/-- Zero reinstatement: the `r = 0` endpoint named by the carrier docstring. -/
+def zeroReinstatement : Reinstatement where
+  r := 0
+  r_nn := le_refl 0
+  r_le_one := by norm_num
+
+/-- Labor-share retention under reinstatement `r`: `ρ(r) = (1 + r) / 2`, so
+    `ρ(0) = 1/2` (zero reinstatement halves the worker's consumption share)
+    and `ρ(1) = 1` (full reinstatement: welfare tracks GDP).
+
+    FRAMEWORK: the affine form is a declared functional-form bridge, like the
+    exposure → TFP channel above; every theorem below is THEOREM-grade about
+    this carrier. -/
+noncomputable def retention (R : Reinstatement) : ℝ := (1 + R.r) / 2
+
+/-- THEOREM: `ρ(r) > 0`. Consumes the carrier field `r_nn : 0 ≤ r`. -/
+theorem retention_pos (R : Reinstatement) : 0 < retention R := by
+  unfold retention
+  linarith [R.r_nn]
+
+/-- THEOREM: `ρ(r) ≤ 1`. Consumes the carrier field `r_le_one : r ≤ 1`. -/
+theorem retention_le_one (R : Reinstatement) : retention R ≤ 1 := by
+  unfold retention
+  linarith [R.r_le_one]
+
+/-- `gA` is bounded by `costSavings`: exposure lies in `[0, 1]`. -/
+theorem gA_le_costSavings (s : Scenario) (t : ℝ) : s.gA t ≤ s.costSavings := by
+  unfold gA
+  have hmem := exposureFromHorizon_mem_unit
+    (taskHorizon (intelligenceLevel t s.T) s.H₀) s.Hmax
+  have := mul_le_mul_of_nonneg_right hmem.2 s.cost_nn
+  rw [one_mul] at this
+  exact this
+
+/-- The representative worker's consumption at time `t`: baseline `C₀`, grown
+    along the scenario's log-GDP deviation, scaled by labor-share retention. -/
+noncomputable def reinstatedConsumption (C₀ : ℝ) (s : Scenario)
+    (R : Reinstatement) (t : ℝ) : ℝ :=
+  C₀ * retention R * Real.exp (s.logGDPDeviation t)
+
+/-- THEOREM (welfare through the `Reinstatement` carrier): the welfare change
+    decomposes as `log ρ(r) + logGDPDeviation t`. The carrier's `r_nn` field
+    is consumed: positivity of `ρ` makes the logarithm total at each factor. -/
+theorem welfareDelta_reinstated (C₀ : ℝ) (hC₀ : 0 < C₀) (s : Scenario)
+    (R : Reinstatement) (t : ℝ) :
+    welfareDelta C₀ (reinstatedConsumption C₀ s R t) =
+      Real.log (retention R) + s.logGDPDeviation t := by
+  unfold welfareDelta
+  have hρ : 0 < retention R := retention_pos R
+  have h1 : Real.log ((C₀ * retention R) * Real.exp (s.logGDPDeviation t))
+      = Real.log (C₀ * retention R) + s.logGDPDeviation t := by
+    rw [Real.log_mul (ne_of_gt (mul_pos hC₀ hρ)) (ne_of_gt (Real.exp_pos _)),
+        Real.log_exp]
+  have hX : reinstatedConsumption C₀ s R t
+      = (C₀ * retention R) * Real.exp (s.logGDPDeviation t) := rfl
+  rw [hX, h1, Real.log_mul (ne_of_gt hC₀) (ne_of_gt hρ)]
+  ring
+
+/-- THEOREM (divergence criterion through the carrier): if GDP rises
+    (`0 < logGDPDeviation t`) but by strictly less than `log 2`, then zero
+    reinstatement (`r = 0`) makes welfare strictly fall. -/
+theorem welfare_falls_at_zero_reinstatement (C₀ : ℝ) (hC₀ : 0 < C₀) (s : Scenario)
+    (R : Reinstatement) (hR0 : R.r = 0) {t : ℝ}
+    (_hpos : 0 < s.logGDPDeviation t) (hlt : s.logGDPDeviation t < Real.log 2) :
+    welfareDelta C₀ (reinstatedConsumption C₀ s R t) < 0 := by
+  have hρ : retention R = 1 / 2 := by
+    unfold retention
+    rw [hR0]
+    norm_num
+  rw [welfareDelta_reinstated C₀ hC₀ s R t, hρ,
+      Real.log_div (by norm_num : (1 : ℝ) ≠ 0) (by norm_num : (2 : ℝ) ≠ 0),
+      Real.log_one]
+  linarith
+
+/-- THEOREM (the carrier bounds welfare by the GDP deviation): for every
+    reinstatement parameter and every time, the welfare change is at most the
+    log-GDP deviation. Consumes `r_le_one` through `retention_le_one`. -/
+theorem welfare_le_logGDPDeviation (C₀ : ℝ) (hC₀ : 0 < C₀) (s : Scenario)
+    (R : Reinstatement) (t : ℝ) :
+    welfareDelta C₀ (reinstatedConsumption C₀ s R t) ≤ s.logGDPDeviation t := by
+  rw [welfareDelta_reinstated C₀ hC₀ s R t]
+  have : Real.log (retention R) ≤ retention R - 1 :=
+    Real.log_le_sub_one_of_pos (retention_pos R)
+  linarith [retention_le_one R]
+
+/-- THEOREM (full reinstatement: welfare tracks GDP): with `r = 1` the
+    welfare change equals the log-GDP deviation, so a nonnegatively rising
+    forecast raises welfare — the docstring's `r = 1` regime, now proved. -/
+theorem welfare_tracks_gdp_at_full_reinstatement (C₀ : ℝ) (hC₀ : 0 < C₀)
+    (s : Scenario) (R : Reinstatement) (hR1 : R.r = 1) {t : ℝ}
+    (ht : 0 ≤ s.logGDPDeviation t) :
+    0 ≤ welfareDelta C₀ (reinstatedConsumption C₀ s R t) := by
+  have hρ : retention R = 1 := by
+    unfold retention
+    rw [hR1]
+    norm_num
+  rw [welfareDelta_reinstated C₀ hC₀ s R t, hρ, Real.log_one]
+  linarith
 
 end Scenario
 
@@ -176,5 +266,59 @@ theorem metr_fast_dominates_baseline {t : ℝ} (ht : 0 ≤ t) :
     metrBaselineScenario.logGDPDeviation t ≤ metrFastScenario.logGDPDeviation t := by
   apply Scenario.forecast_mono_intelligence metrFastScenario metrBaselineScenario
     (show (4 : ℝ) ≤ 7 by norm_num) rfl rfl rfl rfl rfl ht
+
+/-- THEOREM (welfare–GDP divergence, through the `Reinstatement` carrier):
+    there exist a scenario, a reinstatement parameter with `r = 0`, a
+    baseline `C₀ > 0`, and a time `t > 0` at which the log-GDP deviation is
+    strictly positive while the representative worker's welfare change is
+    strictly negative.
+
+    This replaces the former `welfare_trajectory_can_diverge_from_gdp`,
+    whose statement was `∃ Y Y' lam lam', …` — it quantified over none of
+    the objects its docstring named (no scenario, no reinstatement
+    parameter, no time, no `logGDPDeviation`), routing around `Reinstatement`
+    entirely. The carrier is now load-bearing: `r_nn` and `r_le_one` are
+    consumed as literal hypotheses in `Scenario.welfareDelta_reinstated` and
+    `Scenario.welfare_le_logGDPDeviation`, and the witnessing scenario
+    `metrFastScenario` at `t = 1` has a *provably* positive log-GDP
+    deviation bounded by the one-month growth `0.1762 < log 2`, so the
+    `r = 0` halving dominates. -/
+theorem welfare_GDP_divergence_via_Reinstatement :
+    ∃ (s : Scenario) (R : Scenario.Reinstatement) (C₀ t : ℝ),
+      R.r = 0 ∧ 0 < C₀ ∧ 0 < t ∧ 0 < s.logGDPDeviation t ∧
+        welfareDelta C₀ (Scenario.reinstatedConsumption C₀ s R t) < 0 := by
+  refine ⟨metrFastScenario, Scenario.zeroReinstatement, 1, 1,
+    rfl, zero_lt_one, zero_lt_one, ?_, ?_⟩
+  · have hpos : 0 < metrFastScenario.logGDPDeviation 1 := by
+      show 0 < (metrFastScenario.gA 1 + (1 - metrFastScenario.α)
+        * metrFastScenario.gK) * 1
+      rw [mul_one]
+      have hgK : (0 : ℝ) < (1 - metrFastScenario.α) * metrFastScenario.gK := by
+        show (1 - (6 : ℝ) / 10) * (3 / 1000) > 0
+        norm_num
+      linarith [Scenario.gA_nonneg metrFastScenario 1, hgK]
+    exact hpos
+  · refine Scenario.welfare_falls_at_zero_reinstatement 1 zero_lt_one
+      metrFastScenario Scenario.zeroReinstatement rfl ?_ ?_
+    · show 0 < (metrFastScenario.gA 1 + (1 - metrFastScenario.α)
+        * metrFastScenario.gK) * 1
+      rw [mul_one]
+      have hgK : (0 : ℝ) < (1 - metrFastScenario.α) * metrFastScenario.gK := by
+        show (1 - (6 : ℝ) / 10) * (3 / 1000) > 0
+        norm_num
+      linarith [Scenario.gA_nonneg metrFastScenario 1, hgK]
+    · show (metrFastScenario.gA 1 + (1 - metrFastScenario.α)
+        * metrFastScenario.gK) * 1 < Real.log 2
+      rw [mul_one]
+      have hle := Scenario.gA_le_costSavings metrFastScenario 1
+      have hnum : (175 : ℝ) / 1000 + (1 - 6 / 10) * (3 / 1000) = 1762 / 10000 := by
+        norm_num
+      have hlt : (1762 : ℝ) / 10000 < Real.log 2 :=
+        lt_trans (by norm_num : (1762 : ℝ) / 10000 < 0.6931471803)
+          Real.log_two_gt_d9
+      have hcs : metrFastScenario.costSavings = (175 : ℝ) / 1000 := rfl
+      have hgK : (1 - metrFastScenario.α) * metrFastScenario.gK
+          = (1 - (6 : ℝ) / 10) * (3 / 1000) := rfl
+      linarith [hle, hcs, hgK, hnum, hlt]
 
 end Economy
