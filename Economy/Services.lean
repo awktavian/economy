@@ -208,4 +208,42 @@ theorem baumol_drag_serviceShare_strict {b : BaumolParams} {gP : ℝ} (hgP : 0 <
 
 end
 
+
+/-! ### Carrier consumption — calibrated two-sector Baumol instance
+
+The share theorems are `∀ b : BaumolParams` (two strictly positive sector
+outputs, nonnegative exposed growth). The bundle is satisfiable; the
+witness below fixes it to index-unit sectors with 1% exposed growth, and
+the numeric evaluation shows the strict fall `1/2 → 100/201` is attained,
+so `baumol_service_share_falls_strict` binds on non-degenerate data.
+Scales are illustrative, not estimates. -/
+
+/-- Illustrative two-sector carrier: equal base real outputs (index units),
+    exposed-sector TFP growth 1% per period. -/
+noncomputable def baumolIllustrative : BaumolParams where
+  exposedOutput := 1
+  serviceOutput := 1
+  exposedTFPGrowth := 1 / 100
+  exposedOutput_pos := by norm_num
+  serviceOutput_pos := by norm_num
+  growth_nonneg := by norm_num
+
+/-- THEOREM (attainment): the pre-shock service share is exactly `1/2` and
+    the post-shock share exactly `100/201`. -/
+theorem baumolIllustrative_shares :
+    serviceShareBefore baumolIllustrative = 1 / 2 ∧
+      serviceShareAfter baumolIllustrative = 100 / 201 := by
+  refine ⟨?_, ?_⟩
+  · show (1 : ℝ) / (1 + 1) = 1 / 2
+    norm_num
+  · show (1 : ℝ) / (1 * (1 + 1 / 100) + 1) = 100 / 201
+    norm_num
+
+/-- THEOREM (strict fall attained): at the witness the service share falls
+    strictly, `100/201 < 1/2`. -/
+theorem baumolIllustrative_share_drops :
+    serviceShareAfter baumolIllustrative < serviceShareBefore baumolIllustrative := by
+  rw [baumolIllustrative_shares.2, baumolIllustrative_shares.1]
+  norm_num
+
 end Economy

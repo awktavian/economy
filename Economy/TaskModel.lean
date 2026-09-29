@@ -197,6 +197,74 @@ theorem cobbDouglas_as_unit_CES_limit (α y1 y2 : ℝ)
       |Economy.cesAggregate ρ α y1 y2 - y1 ^ α * y2 ^ (1 - α)| < ε :=
   Economy.ces_to_cobb_douglas_limit α y1 y2 hα0 hα1 hy1 hy2
 
+
+/-! ### Carrier consumption — the task-count boundary
+
+`TaskEconomy n` carries weights summing to one, so the endpoint value
+`n = 0` is NOT admissible: `alpha_sum_one` reads `∑ i : Fin 0, α i = 1`,
+i.e. `0 = 1`. The family is inhabited at `n = 2` below, so `log_Y_eq`,
+`hulten_discrete` and `acemoglu_macro_bound` carry content for `n ≥ 1`
+and are vacuous only at `n = 0`. -/
+
+/-- THEOREM (endpoint `n = 0`): the carrier is unsatisfiable at zero tasks. -/
+theorem noTaskEconomyZero : ¬ Nonempty (TaskEconomy 0) := by
+  rintro ⟨E⟩
+  have h := E.alpha_sum_one
+  rw [show (∑ i : Fin 0, E.α i) = (0 : ℝ) from by simp] at h
+  exact absurd h (by norm_num)
+
+/-- THEOREM (inhabited at `n = 2`): a two-task economy with task
+    productivities `1/4` and `16`, automation share `ψ = 1/2`, unit factor
+    inputs, and Cobb-Douglas weights `(1/2, 1/2)`. All side conditions are
+    discharged by `norm_num` / `fin_cases`. -/
+noncomputable def taskPair : TaskEconomy 2 where
+  A := ![1 / 4, 16]
+  ψ := fun _ => 1 / 2
+  k := fun _ => 1
+  ℓ := fun _ => 1
+  α := fun _ => 1 / 2
+  A_pos := by
+    intro i; fin_cases i <;> simp
+  psi_nonneg := by intro i; norm_num
+  psi_le_one := by intro i; norm_num
+  k_nonneg := by intro i; norm_num
+  l_nonneg := by intro i; norm_num
+  alpha_nonneg := by intro i; norm_num
+  alpha_sum_one := by
+    rw [Fin.sum_univ_two]
+    norm_num
+  input_pos := by
+    intro i; norm_num
+
+/-- Task outputs at the witness. -/
+theorem taskPair_y0 : taskPair.y (0 : Fin 2) = 1 / 4 := by
+  unfold TaskEconomy.y
+  show ((1 / 4 : ℝ) * ((1 / 2 : ℝ) * 1 + (1 - 1 / 2) * 1)) = 1 / 4
+  norm_num
+
+theorem taskPair_y1 : taskPair.y (1 : Fin 2) = 16 := by
+  unfold TaskEconomy.y
+  show ((16 : ℝ) * ((1 / 2 : ℝ) * 1 + (1 - 1 / 2) * 1)) = 16
+  norm_num
+
+/-- THEOREM (aggregate at the witness): the two-task Cobb-Douglas aggregate
+    is exactly `Y = 2`, the geometric mean of `1/4` and `16` — the product
+    machinery of `TaskEconomy.Y` evaluated on inhabited, non-degenerate
+    data. -/
+theorem taskPair_Y : TaskEconomy.Y taskPair = 2 := by
+  unfold TaskEconomy.Y
+  rw [Fin.prod_univ_two]
+  rw [taskPair_y0, taskPair_y1]
+  show ((1 / 4 : ℝ) ^ (1 / 2 : ℝ)) * (16 ^ (1 / 2 : ℝ)) = 2
+  have h0 : ((1 / 4 : ℝ) ^ (1 / 2 : ℝ)) = 1 / 2 := by
+    rw [← Real.sqrt_eq_rpow]
+    norm_num
+  have h1 : (16 : ℝ) ^ (1 / 2 : ℝ) = 4 := by
+    rw [← Real.sqrt_eq_rpow]
+    norm_num
+  rw [h0, h1]
+  norm_num
+
 end TaskEconomy
 
 end Economy

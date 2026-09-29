@@ -420,4 +420,55 @@ theorem ghost_gdp_ofCobbDouglasPaths (p : CobbDouglas) (A K L Y : ℝ → ℝ) (
 
 end SolowGrowth
 
+
+/-! ### Carrier consumption — BEA-calibrated Cobb-Douglas instance
+
+The theorems above are `∀ p : CobbDouglas`. The hypothesis bundle
+(`0 < A`, `0 ≤ K`, `0 ≤ L`, `0 < α < 1`) is satisfiable, and the witness
+below pins the competitive-factor-income chain to the BEA labor share
+`α = 0.60` used throughout `Economy.Calibration`. The `A = K = L = 1`
+normalization is an index choice (base period), not a measurement. -/
+
+/-- BEA-calibrated Cobb-Douglas carrier: labor share `α = 6/10`, base-period
+    normalization `A = K = L = 1`. -/
+noncomputable def cobbDouglasBEA : CobbDouglas where
+  A := 1
+  K := 1
+  L := 1
+  α := 6 / 10
+  A_pos := by norm_num
+  K_nn := by norm_num
+  L_nn := by norm_num
+  α_pos := by norm_num
+  α_lt_one := by norm_num
+
+/-- THEOREM: output at the calibrated carrier equals the index normalization. -/
+theorem cobbDouglasBEA_Y : CobbDouglas.Y cobbDouglasBEA = 1 := by
+  show (1 : ℝ) * 1 ^ (1 - 6 / 10) * 1 ^ (6 / 10) = 1
+  rw [Real.one_rpow, Real.one_rpow]
+  norm_num
+
+/-- THEOREM (factor shares at the carrier): paying each factor its marginal
+    product at the BEA calibration gives labor income share exactly `6/10`
+    and capital income share exactly `4/10` — the derived identities
+    `cobbDouglas_labor_share` /
+    `FactorIncome.capital_share_equals_one_minus_alpha` evaluated on
+    inhabited, non-degenerate data. -/
+theorem cobbDouglasBEA_factor_shares :
+    let f := ofCompetitivePrices cobbDouglasBEA (by norm_num : (0 : ℝ) < 1)
+      (by norm_num : (0 : ℝ) < 1)
+    f.w * f.L / f.Y = 6 / 10 ∧ f.r * f.K / f.Y = 4 / 10 := by
+  refine ⟨cobbDouglas_labor_share cobbDouglasBEA
+      (by norm_num : (0 : ℝ) < 1) (by norm_num : (0 : ℝ) < 1), ?_⟩
+  have hY : (ofCompetitivePrices cobbDouglasBEA (by norm_num : (0 : ℝ) < 1)
+      (by norm_num : (0 : ℝ) < 1)).Y ≠ 0 := by
+    show CobbDouglas.Y cobbDouglasBEA ≠ 0
+    rw [cobbDouglasBEA_Y]
+    norm_num
+  have hα : (1 : ℝ) - (ofCompetitivePrices cobbDouglasBEA
+      (by norm_num : (0 : ℝ) < 1) (by norm_num : (0 : ℝ) < 1)).α = 4 / 10 := by
+    show (1 : ℝ) - 6 / 10 = 4 / 10
+    norm_num
+  exact (FactorIncome.capital_share_equals_one_minus_alpha _ hY).trans hα
+
 end Economy

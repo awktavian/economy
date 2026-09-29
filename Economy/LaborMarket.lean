@@ -58,4 +58,42 @@ theorem employmentDelta_antitone_disp {p q : LaborParams}
   unfold employmentDelta
   rw [h_rein]; linarith
 
+
+/-! ### Carrier consumption — both sign branches are inhabited
+
+The equivalences `employment_decline_iff` / `employment_grow_iff` quantify
+over all of `LaborParams`. If the carrier were uninhabited, or if every
+admissible instance had `employmentDelta` of one sign, the two-sided
+readings would be vacuous on the other side. The two witnesses below pin
+the negative and the positive branch to concrete data (scales illustrative,
+not measurements). -/
+
+/-- Displacement-heavy flows: no reinstatement, positive displacement. -/
+noncomputable def laborDisplaced : LaborParams where
+  reinstatement := 0
+  displacement := 6 / 100
+  rein_nonneg := by norm_num
+  disp_nonneg := by norm_num
+
+/-- Reinstatement-heavy flows: positive reinstatement, no displacement. -/
+noncomputable def laborReinstated : LaborParams where
+  reinstatement := 1 / 100
+  displacement := 0
+  rein_nonneg := by norm_num
+  disp_nonneg := by norm_num
+
+/-- THEOREM (decline branch non-vacuous): some admissible `LaborParams` have
+    strictly negative net employment change; consumed from
+    `employment_decline_iff` at `laborDisplaced`. -/
+theorem employment_decline_attainable : ∃ p : LaborParams, employmentDelta p < 0 :=
+  ⟨laborDisplaced, (employment_decline_iff laborDisplaced).mpr
+    (by norm_num [laborDisplaced])⟩
+
+/-- THEOREM (growth branch non-vacuous): some admissible `LaborParams` have
+    strictly positive net employment change; consumed from
+    `employment_grow_iff` at `laborReinstated`. -/
+theorem employment_grow_attainable : ∃ p : LaborParams, 0 < employmentDelta p :=
+  ⟨laborReinstated, (employment_grow_iff laborReinstated).mpr
+    (by norm_num [laborReinstated])⟩
+
 end Economy
