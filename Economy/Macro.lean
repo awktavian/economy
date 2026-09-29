@@ -471,4 +471,28 @@ theorem cobbDouglasBEA_factor_shares :
     norm_num
   exact (FactorIncome.capital_share_equals_one_minus_alpha _ hY).trans hα
 
+/-- Index-normalized expenditure carrier for `MacroState`: components as
+    shares of a unit GDP index (C 0.68, I 0.18, G 0.18, NX −0.04, summing
+    to 1). The composition is chosen-plausible for the US NIPA structure —
+    NOT a dated anchor from `REFERENCES.md`; like `cobbDouglasBEA`'s
+    `A = K = L = 1`, it is an index choice that makes the
+    `∀ s : MacroState` expenditure-side identities of
+    `Economy.FinanceRealCoupling` concrete. -/
+noncomputable def macroStateIndexNorm : MacroState where
+  C := 68 / 100
+  I := 18 / 100
+  G := 18 / 100
+  NX := -(4 / 100)
+
+/-- THEOREM (normalization consistency): the index components sum to the
+    unit GDP index under the definitional expenditure identity. -/
+theorem macroStateIndexNorm_Y : MacroState.Y macroStateIndexNorm = 1 := by
+  have h1 : macroStateIndexNorm.C = (68 : ℝ) / 100 := rfl
+  have h2 : macroStateIndexNorm.I = (18 : ℝ) / 100 := rfl
+  have h3 : macroStateIndexNorm.G = (18 : ℝ) / 100 := rfl
+  have h4 : macroStateIndexNorm.NX = -((4 : ℝ) / 100) := rfl
+  unfold MacroState.Y
+  rw [h1, h2, h3, h4]
+  norm_num
+
 end Economy

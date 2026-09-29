@@ -181,4 +181,33 @@ theorem matchingFunction_symmetric_at_half (p : MatchingParams)
   ring
 
 
+/-- Petrongolo–Pissarides midpoint slice of the matching-parameter box:
+    efficiency normalized `μ = 1`, unemployment elasticity `η = 1/2` (the
+    Cobb-Douglas matching case; Petrongolo–Pissarides (JEL 2001) survey
+    estimates cluster near 0.5). NORMALIZATION choice, not a dated point
+    estimate from `REFERENCES.md`. Makes the `∀ p : MatchingParams`
+    monotonicity theorems concrete. -/
+noncomputable def matchingPPMid : MatchingParams where
+  μ := 1
+  η := 1 / 2
+  μ_pos := by norm_num
+  η_pos := by norm_num
+  η_lt_one := by norm_num
+
+/-- THEOREM: at unit tightness both rates equal the efficiency
+    normalization: `f(1) = q(1) = 1`. -/
+theorem matchingPPMid_f_one : matchingPPMid.f 1 = 1 := by
+  have hm : matchingPPMid.μ = (1 : ℝ) := rfl
+  have he : matchingPPMid.η = (1 : ℝ) / 2 := rfl
+  unfold MatchingParams.f
+  rw [hm, he, Real.one_rpow]
+  norm_num
+
+theorem matchingPPMid_q_one : matchingPPMid.q 1 = 1 := by
+  have hm : matchingPPMid.μ = (1 : ℝ) := rfl
+  have he : matchingPPMid.η = (1 : ℝ) / 2 := rfl
+  unfold MatchingParams.q
+  rw [hm, he, Real.one_rpow]
+  norm_num
+
 end Economy

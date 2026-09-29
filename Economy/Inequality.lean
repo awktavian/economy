@@ -198,4 +198,41 @@ theorem twoClassGini_positive_iff_unequal {f w_L w_K : ℝ}
 end TwoClass
 
 
+/-! ### Carrier consumption — the calibrated two-class carrier
+
+The `TwoClass` theorems (`topDecileShare_mem_unit`, `topDecile_linear_bound`)
+and the cross-module `Calibration.welfare_antitone_in_ψ_k` quantify over all
+of `TwoClass`. The witness below pins the dated anchors: capital share
+0.40 = 1 − the BEA labor share 0.60 (`REFERENCES.md` completion rows),
+top-decile capital ownership ψ_k = 0.77 (Piketty–Zucman distributional
+accounts), ν_k = 0.10, output index-normalized to 1. -/
+
+noncomputable def twoClassBEA : TwoClass where
+  α := 4 / 10
+  ψ_k := 77 / 100
+  ν_k := 1 / 10
+  Y := 1
+  α_nn := by norm_num
+  α_le_one := by norm_num
+  ψ_nn := by norm_num
+  ψ_le_one := by norm_num
+  ν_nn := by norm_num
+  ν_le_one := by norm_num
+  Y_pos := by norm_num
+
+/-- THEOREM (model output at the carrier): the two-class decomposition
+    implies a top-decile income share of 0.4·0.77 + 0.6·0.1 = 36.8% on
+    the unit output index. Model computation at the dated shares; the
+    pro-rata labor allocation is the model's simplification, stated in
+    the structure's header. -/
+theorem twoClassBEA_topDecileShare :
+    TwoClass.topDecileShare twoClassBEA = 368 / 1000 := by
+  have h1 : twoClassBEA.α = (4 : ℝ) / 10 := rfl
+  have h2 : twoClassBEA.ψ_k = (77 : ℝ) / 100 := rfl
+  have h3 : twoClassBEA.ν_k = (1 : ℝ) / 10 := rfl
+  have h4 : twoClassBEA.Y = (1 : ℝ) := rfl
+  unfold TwoClass.topDecileShare TwoClass.topDecileIncome
+  rw [h1, h2, h3, h4]
+  norm_num
+
 end Economy

@@ -87,4 +87,38 @@ theorem deltaTFP_antitone_friction {p q : TFPParams}
     mul_nonneg q.exposure_nonneg q.cost_nonneg
   nlinarith
 
+/-! ### Carrier consumption — the Goldman-consistent frictionless corner
+
+`deltaTFP_mono_exposure` / `deltaTFP_antitone_friction` quantify over all of
+`TFPParams`, and `Economy.Bounds.litBox_upper_tight` shows the parameter box
+is inhabited by an anonymous corner. The named carrier below pins the cited
+Goldman-consistent corner from `REFERENCES.md` §5: exposure 0.40 (IMF Jan 2024
+global-exposure estimate), costSavings 0.175 (the Goldman-consistent baseline
+coefficient: 0.40 × 0.175 = 7%), friction 0 (the frictionless upper bound of
+the `TFPParams` docstring convention). -/
+
+/-- The Goldman-consistent corner of the TFP box: ΔTFP = 0.40 × 0.175 = 7%. -/
+noncomputable def tfpGoldmanCorner : TFPParams where
+  exposure := 40 / 100
+  costSavings := 175 / 1000
+  friction := 0
+  exposure_nonneg := by norm_num
+  exposure_le_one := by norm_num
+  cost_nonneg := by norm_num
+  cost_le_one := by norm_num
+  fric_nonneg := by norm_num
+  fric_le_one := by norm_num
+
+/-- THEOREM (anchor pin): the Hulten formula evaluates at
+    `tfpGoldmanCorner` to exactly the cited 7% ten-year envelope. This is
+    a computation of the model output at chosen data, not an independent
+    measurement. -/
+theorem deltaTFP_tfpGoldmanCorner : deltaTFP tfpGoldmanCorner = 7 / 100 := by
+  have h1 : tfpGoldmanCorner.exposure = (40 : ℝ) / 100 := rfl
+  have h2 : tfpGoldmanCorner.costSavings = (175 : ℝ) / 1000 := rfl
+  have h3 : tfpGoldmanCorner.friction = 0 := rfl
+  unfold deltaTFP
+  rw [h1, h2, h3]
+  norm_num
+
 end Economy

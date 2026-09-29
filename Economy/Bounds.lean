@@ -119,4 +119,25 @@ theorem litBox_upper_tight :
 
 end
 
+/-- THEOREM: the Goldman corner is a genuine `LitBox` parameterization
+    (exposure 0.40 at the box ceiling, costSavings 0.175 interior): the
+    literature box is inhabited at the dated-anchor corner, not just at
+    the envelope corner used by `litBox_upper_tight`. -/
+theorem litBox_tfpGoldmanCorner : LitBox Economy.tfpGoldmanCorner := by
+  have h1 : Economy.tfpGoldmanCorner.exposure = (40 : ℝ) / 100 := rfl
+  have h2 : Economy.tfpGoldmanCorner.costSavings = (175 : ℝ) / 1000 := rfl
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [h1]
+    norm_num
+  · rw [h1]
+  · rw [h2]
+    norm_num
+  · rw [h2]
+    norm_num
+
+/-- THEOREM (keystone envelope consumed at the corner): ΔTFP at the
+    Goldman corner is ≤ the 12% litBox ceiling, via `litBox_upper`. -/
+theorem litBoxGoldman_upper : deltaTFP Economy.tfpGoldmanCorner ≤ 12 / 100 :=
+  litBox_upper _ litBox_tfpGoldmanCorner
+
 end Economy
