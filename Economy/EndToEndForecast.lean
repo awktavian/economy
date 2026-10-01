@@ -32,9 +32,17 @@ theorem pipeline_metr_horizon_36mo :
 /-- **P2. Goldman / Acemoglu envelope consistency.**
     At the Goldman-high corner (exposure 0.40, costSavings 0.175, friction 0),
     `deltaTFP p ≤ 700/10000`. This is the 10-year ceiling cited in the
-    forecast; every scenario in `calBEA2026 / calBaseline / calPessimistic`
-    operates strictly inside this envelope because exposure is clipped to
-    [0,1] and costSavings ≤ 0.25. -/
+    forecast. SCOPE (corrected 2026-10-01, lane rsi/cond-bsd-economy):
+    this theorem pins the envelope at the corner only. No theorem here
+    establishes that the scenarios built from `calBEA2026 / calBaseline /
+    calPessimistic` operate inside it, and the justification previously
+    stated here ("exposure is clipped to [0,1] and costSavings ≤ 0.25")
+    does not imply the 7/100 ceiling — the model formula at exposure = 1,
+    costSavings = 25/100, friction = 0 gives deltaTFP = 1/4 (kernel-checked
+    counterexample to the implication, receipt at
+    /Users/Shared/orch-50wide-2026-10-01/cond-bsd-economy/). A
+    calibration-level envelope theorem is open work, not a point this
+    falsification surface has passed. -/
 theorem pipeline_acemoglu_envelope_consistent (p : TFPParams)
     (hx : p.exposure = 40 / 100) (hc : p.costSavings = 175 / 1000)
     (hf : p.friction = 0) : deltaTFP p ≤ 700 / 10000 := by
