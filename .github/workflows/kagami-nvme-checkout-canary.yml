@@ -1,0 +1,20 @@
+name: Kagami NVMe checkout canary
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  checkout:
+    runs-on: [self-hosted, kagami-nvme-economy]
+    timeout-minutes: 5
+    steps:
+      - name: Verify released checkout placement
+        run: /usr/local/bin/kagami-fda-python /usr/local/bin/kagami-runner-launch.py --check-only /Users/schizodactyl/actions-runner/economy
+      - name: Checkout public repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        env:
+          GIT_DIR: ${{ github.workspace }}/.git
+        with:
+          persist-credentials: false
