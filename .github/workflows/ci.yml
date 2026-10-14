@@ -11,10 +11,20 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: [self-hosted, lean]
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Verify Studio checkout placement
+        if: runner.name == 'Tims-Mac-Studio-economy'
+        run: /usr/local/bin/kagami-fda-python /usr/local/bin/kagami-runner-launch.py --check-only /Users/schizodactyl/actions-runner/economy
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        env:
+          GIT_DIR: ${{ github.workspace }}/.git
+        with:
+          persist-credentials: false
       - uses: leanprover/lean-action@v1
