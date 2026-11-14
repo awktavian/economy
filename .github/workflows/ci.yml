@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Native-trust census ratchet (undisclosed native_decide sites may not rise)
         # Counts LIVE tactic sites of the tokens that mint a `_native.*` witness
         # axiom (native_decide, decide +native, bv_decide, Lean.ofReduceBool), with
@@ -33,7 +35,7 @@ jobs:
         # as a warning naming the absence, never as a pass on a count of zero.
         shell: bash
         run: |
-          set -u
+          set -euo pipefail
           R="${REALITY_CHECKOUT:-$HOME/reality}"
           CENSUS="${RUNNER_TEMP:-/tmp}/native_decide_census.py"
           git -C "$R" fetch -q origin main 2>/dev/null || true
@@ -47,3 +49,83 @@ jobs:
           fi
 
       - uses: leanprover/lean-action@v1
+
+  soundness:
+    # Self-hosted: elan and the toolchain pinned by lean-toolchain are already
+    # installed, and the mathlib dependency is a shared cache, not a download.
+    runs-on: [self-hosted, lean]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Preflight — symlink-safe cache seeding
+        shell: bash
+        run: |
+          set -euo pipefail
+          # On this estate .lake/packages/<pkg> is a symlink into the shared
+          # machine-wide cache (~/.lean-cache/mathlib/<rev>). `lake exe cache get`
+          # writes its bundle into the package build dir, so on a symlinked prefix
+          # it would overwrite the cache every other lane builds against. Seed only
+          # when the prefix is a real directory the job owns.
+          if ! command -v lake >/dev/null 2>&1; then
+            echo "::error::lake not on PATH; the pinned toolchain is missing on this runner"
+            exit 1
+          fi
+          LINKED=0
+          if [ -d .lake/packages ]; then
+            for d in .lake/packages/*; do
+              [ -e "$d" ] || [ -L "$d" ] || continue
+              if [ -L "$d" ]; then
+                LINKED=1
+                echo "::notice file=${d}::symlinked package prefix - dependency cache is read-only for this job"
+              fi
+            done
+          fi
+          # A symlinked cache-home prefix has the same write-through problem one
+          # level up: report where it actually resolves instead of trusting the
+          # name. `realpath` is not everywhere, so this degrades to the path
+          # itself rather than failing the step that only wanted to say hello.
+          CACHE_HOME="${LEAN_CACHE_CI:-$HOME/.lean-cache-ci}"
+          if [ -L "$CACHE_HOME" ]; then
+            RESOLVED="$(readlink -f "$CACHE_HOME" 2>/dev/null || realpath "$CACHE_HOME" 2>/dev/null || echo "$CACHE_HOME")"
+            echo "::notice::$CACHE_HOME is a symlink to $RESOLVED - not used as a seeding target"
+          fi
+          if [ "$LINKED" = "1" ]; then
+            echo "MATHLIB_CACHE_SEED=read-only" >> "$GITHUB_ENV"
+          else
+            echo "MATHLIB_CACHE_SEED=seed" >> "$GITHUB_ENV"
+          fi
+
+      - name: Seed dependency cache (real prefixes only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$MATHLIB_CACHE_SEED" = "seed" ]; then
+            lake exe cache get
+          else
+            echo "Skipping cache seeding: the package prefix is symlinked, so this job does not own the cache it would write into."
+          fi
+
+      - name: Build corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake build Economy
+
+      - name: Gate unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
+      - name: Axiom, sorry and README census gate (kernel-checked)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # --slot-wait: the probe batches queue for a build slot instead of
+          # sprawling over the host unleased. A refusal exits 2 -- red, not passed.
+          python3 scripts/audit_axioms.py --check --verify-kernel --slot-wait 900 \
+            --json "${RUNNER_TEMP:-/tmp}/axiom-audit.json"

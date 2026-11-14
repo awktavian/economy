@@ -1,0 +1,5 @@
+# actionlint reads this to recognise the estate runner. Without it every
+# `runs-on: [self-hosted, lean]` is reported as an unknown label.
+self-hosted-runner:
+  labels:
+    - lean

@@ -6,3 +6,7 @@
 **/.lake_backup/
 .syncthing.*.tmp
 output/
+
+# Python gate artifacts (scripts/audit_axioms.py, scripts/test_audit_axioms.py)
+__pycache__/
+*.pyc
