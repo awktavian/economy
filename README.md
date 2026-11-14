@@ -97,6 +97,10 @@ Every batch also runs under `timeout(1)`: the bound is the short one when no lea
 
 `.lake/packages/*` on this estate are symlinks into a shared, machine-wide Mathlib cache. `lake exe cache get` writes into the package build directory, so run against a symlinked prefix it overwrites the cache every other build on the machine depends on. CI probes the prefix first and seeds only when `.lake/packages` is a real directory the job owns. The gate pins the shape of the workflow file: an unguarded `lake exe cache get`, a `rm -rf` of any cache path, `|| true`, `continue-on-error`, a multi-line step without `set -euo pipefail`, `persist-credentials` left on, a kernel pass with no stated position on the build slot, a backtick inside a double-quoted string (bash runs that as a command instead of printing it), or the audit steps going absent — each one fails the run.
 
+### The other CI leg
+
+CI carries a second soundness job beside this gate: the native-trust census ratchet, which counts live tactic sites that mint a compiler-trusted witness (`native_decide` and its relatives), masks comments and strings with Lean's own grammar, and refuses when the undisclosed count rises above `.github/native-decide-baseline.json`. That census lives in exactly one place on the estate — `awkronos/reality`, `scripts/native_decide_census.py` — and the runner reads it out of that repository's object store instead of keeping a copy here, so there is one instrument and one definition of a live site. For the same reason this gate's shell-shape checks look only at commands that can decide soundness: a sibling lane's step must not turn this gate red over a shell idiom that cannot hide a `sorry`.
+
 ---
 
 ## The model in one page

@@ -680,6 +680,25 @@ CI_CHECK_TOKENS = (
 )
 
 
+# Commands whose exit status decides soundness. The shell-shape checks below
+# bite on these only: a `|| true` next to a gate command swallows a verdict,
+# while the same idiom on a `git fetch` retry is just a retry, and flagging
+# that would turn another lane's step into a false red on this gate.
+GATE_COMMANDS = (
+    "audit_axioms.py",
+    "native_decide_census.py",
+    "lake build",
+    "lake exe cache get",
+    "-m unittest",
+    "pytest",
+    "make proof",
+)
+
+
+def is_gate_step(step):
+    return any(marker in step for marker in GATE_COMMANDS)
+
+
 def ci_path_of(root):
     return os.path.join(root, ".github", "workflows", "ci.yml")
 
@@ -717,8 +736,12 @@ def ci_violations(root, text=None):
         stmt = m.group(1).strip()
         if "cache" in stmt or ".lake/packages" in stmt:
             v.append("ci.yml: destructive cache command writes through symlinks: %s" % stmt)
-    if re.search(r"\|\|\s*true", text):
-        v.append("ci.yml: `|| true` would swallow a gate failure")
+    # `|| true` is only a swallowed verdict when the command it guards is one
+    # that decides soundness; `git fetch ... || true` is a retry.
+    for num, line in enumerate(text.splitlines(), start=1):
+        if re.search(r"\|\|\s*true", line) and is_gate_step(line):
+            v.append("ci.yml:%d: `|| true` swallows a gate failure: %s"
+                     % (num, line.strip()[:90]))
     if re.search(r"continue-on-error:\s*true", text):
         v.append("ci.yml: continue-on-error makes the audit advisory")
     if "lake exe cache get" in text and not cache_get_guarded(text):
@@ -739,9 +762,12 @@ def ci_violations(root, text=None):
             "there is no slot table to ask."
         )
     for step in run_steps(text):
+        if not is_gate_step(step):
+            continue
         if len(step.strip().splitlines()) > 1 and "set -euo pipefail" not in step:
             first = step.strip().splitlines()[0]
-            v.append("ci.yml: multi-line run step without `set -euo pipefail`: %s" % first[:60])
+            v.append("ci.yml: multi-line gate step without `set -euo pipefail`, so a "
+                     "failing command before the last one is not fatal: %s" % first[:60])
         # Backticks inside double quotes are still command substitution in bash,
         # so a "we are skipping this" message can quietly run the very command
         # the step exists to guard.

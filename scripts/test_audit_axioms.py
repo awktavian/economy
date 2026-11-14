@@ -463,6 +463,47 @@ class CiInvariants(Fixture):
         self.assertTrue(any("execute as a command" in v for v in self.ci(text)),
                         self.ci(text))
 
+    def test_a_retry_on_a_non_gate_command_is_not_a_swallowed_verdict(self):
+        # `|| true` is a defect when it guards a verdict. On a `git fetch`
+        # before a read from another repo's object store it is just a retry,
+        # and refusing it here would make this gate red over a sibling lane's
+        # step that cannot hide a soundness failure.
+        text = good_ci().replace(
+            "          python3 scripts",
+            "          git -C \"$HOME/reality\" fetch -q origin main 2>/dev/null || true\n"
+            "          python3 scripts")
+        self.assertEqual(self.ci(text), [])
+
+    def test_a_non_gate_step_may_skip_pipefail(self):
+        text = good_ci().replace(
+            "      - name: Build and gate",
+            "      - name: Report\n        shell: bash\n        run: |\n"
+            "          set -u\n          echo built\n"
+            "      - name: Build and gate")
+        self.assertEqual(self.ci(text), [])
+
+    def test_sibling_ratchet_job_coexists(self):
+        """The native-trust ratchet job that landed on main beside this gate."""
+        sibling = """      - name: Native-trust census ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          R="${REALITY_CHECKOUT:-$HOME/reality}"
+          CENSUS="${RUNNER_TEMP:-/tmp}/native_decide_census.py"
+          git -C "$R" fetch -q origin main 2>/dev/null || true
+          if git -C "$R" show origin/main:scripts/native_decide_census.py > "$CENSUS" 2>/dev/null \\
+              && grep -q -- '--ratchet' "$CENSUS"; then
+            python3 "$CENSUS" --self-test
+            python3 "$CENSUS" --root "$GITHUB_WORKSPACE" --ratchet baseline.json
+            exit "${PIPESTATUS[0]}"
+          else
+            echo "::warning::census UNMEASURED on this runner"
+          fi
+"""
+        text = good_ci().replace("      - name: Build and gate",
+                                 sibling + "      - name: Build and gate")
+        self.assertEqual(self.ci(text), [])
+
 
 # --------------------------------------------------------------------------
 # Kernel output handling
