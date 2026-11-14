@@ -37,6 +37,7 @@ jobs:
         # rc 2 = UNMEASURED (control did not fire, unreadable file or baseline) and
         # fails. A runner with no reality checkout cannot measure: that is reported
         # as a warning naming the absence, never as a pass on a count of zero.
+        timeout-minutes: 10
         shell: bash
         run: |
           set -euo pipefail
@@ -66,80 +67,116 @@ jobs:
 
   soundness:
     # Self-hosted: elan and the toolchain pinned by lean-toolchain are already
-    # installed, and the mathlib dependency is a shared cache, not a download.
+    # installed. The Mathlib dependency arrives by BINDING the machine-wide warm
+    # cache (scripts/warm_cache.py), not by downloading it -- see the seed note
+    # below. Job ceiling 60: every step under it carries its own ceiling and
+    # they sum to 52, so a step always reports its own name before the job
+    # bound can fire. A job-level cancellation is what made run 43547320929
+    # useless: it concluded `cancelled` with the gate step never executed.
     runs-on: [self-hosted, lean]
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Preflight — symlink-safe cache seeding
+      - name: Bind the estate warm Mathlib cache
+        timeout-minutes: 5
         shell: bash
         run: |
           set -euo pipefail
-          # On this estate .lake/packages/<pkg> is a symlink into the shared
-          # machine-wide cache (~/.lean-cache/mathlib/<rev>). `lake exe cache get`
-          # writes its bundle into the package build dir, so on a symlinked prefix
-          # it would overwrite the cache every other lane builds against. Seed only
-          # when the prefix is a real directory the job owns.
           if ! command -v lake >/dev/null 2>&1; then
             echo "::error::lake not on PATH; the pinned toolchain is missing on this runner"
             exit 1
           fi
-          LINKED=0
-          if [ -d .lake/packages ]; then
-            for d in .lake/packages/*; do
-              [ -e "$d" ] || [ -L "$d" ] || continue
-              if [ -L "$d" ]; then
-                LINKED=1
-                echo "::notice file=${d}::symlinked package prefix - dependency cache is read-only for this job"
-              fi
-            done
-          fi
-          # A symlinked cache-home prefix has the same write-through problem one
-          # level up: report where it actually resolves instead of trusting the
-          # name. `realpath` is not everywhere, so this degrades to the path
-          # itself rather than failing the step that only wanted to say hello.
-          CACHE_HOME="${LEAN_CACHE_CI:-$HOME/.lean-cache-ci}"
-          if [ -L "$CACHE_HOME" ]; then
-            RESOLVED="$(readlink -f "$CACHE_HOME" 2>/dev/null || realpath "$CACHE_HOME" 2>/dev/null || echo "$CACHE_HOME")"
-            echo "::notice::$CACHE_HOME is a symlink to $RESOLVED - not used as a seeding target"
-          fi
-          if [ "$LINKED" = "1" ]; then
-            echo "MATHLIB_CACHE_SEED=read-only" >> "$GITHUB_ENV"
-          else
-            echo "MATHLIB_CACHE_SEED=seed" >> "$GITHUB_ENV"
-          fi
-
-      - name: Seed dependency cache (real prefixes only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$MATHLIB_CACHE_SEED" = "seed" ]; then
-            lake exe cache get
-          else
-            echo "Skipping cache seeding: the package prefix is symlinked, so this job does not own the cache it would write into."
+          # Why this replaced `lake exe cache get`. On run 43547320929 that step
+          # ran 02:43:11 -> 03:27:31 (44m20s), was cut by the job ceiling, and
+          # cancelled the job before the build, the unit tests and the axiom gate
+          # had run -- the fourth `cancelled` in a row for this repository, with
+          # the corpus never once checked. The estate already keeps one built
+          # Mathlib per revision in ~/.lean-cache(-ci)/mathlib/<rev> and every
+          # lane reaches it by symlinking the package dir; a clean-room CI-shaped
+          # checkout doing the same built Economy in 123.64s with no download.
+          # warm_cache.py is that bind, and it only ever creates a link where
+          # nothing real stands: it never deletes and never writes through a
+          # symlink, which is the vector that would corrupt the shared cache for
+          # every other build on this host.
+          rc=0
+          python3 scripts/warm_cache.py --apply \
+            --json "${RUNNER_TEMP:-/tmp}/warm-cache.json" || rc=$?
+          if [ "$rc" -ne 0 ]; then
+            if [ -d .lake/packages ] && [ -n "$(find .lake/packages -maxdepth 1 -type l 2>/dev/null)" ]; then
+              echo "::error file=.github/workflows/ci.yml::.lake/packages contains symlinks and warm_cache.py refused (rc=$rc); refusing lake exe cache get to avoid writing through shared cache symlinks"
+              exit 1
+            fi
+            # No provably warm generation here (a GitHub-hosted runner, or a
+            # revision nobody has built). Fetch instead -- bounded, so a slow
+            # CDN cannot eat the job again.
+            echo "::notice file=.github/workflows/ci.yml::no estate warm generation for this manifest (bind exited $rc); falling back to a bounded cache fetch"
+            if command -v timeout >/dev/null 2>&1; then
+              timeout 240 lake exe cache get || {
+                echo "::error::the bounded cache fetch did not finish in 240s on a runner with no warm generation; this is an environment finding, not a corpus verdict"
+                exit 1
+              }
+            elif command -v gtimeout >/dev/null 2>&1; then
+              gtimeout 240 lake exe cache get || {
+                echo "::error::the bounded cache fetch did not finish in 240s on a runner with no warm generation; this is an environment finding, not a corpus verdict"
+                exit 1
+              }
+            else
+              echo "::error::no timeout(1) on this runner, so the fallback fetch would be unbounded; refusing to start it"
+              exit 1
+            fi
           fi
 
       - name: Build corpus
+        timeout-minutes: 12
         shell: bash
         run: |
           set -euo pipefail
-          lake build Economy
+          # Bounded for the same reason as the step above: an unbounded
+          # `lake build` on a cold tree means a from-source Mathlib, which is
+          # hours and will be killed mid-flight with no named cause. Measured
+          # against the warm bind: 123.64s for 3284 jobs.
+          wall="timeout"
+          command -v timeout >/dev/null 2>&1 || wall="gtimeout"
+          if ! command -v "$wall" >/dev/null 2>&1; then
+            echo "::warning::no timeout(1) on this runner; the step ceiling is the only bound"
+            lake build Economy
+            exit 0
+          fi
+          "$wall" 600 lake build Economy || {
+            rc=$?
+            if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+              echo "::error::lake build Economy hit its 600s bound (rc=$rc): the dependency cache is not warm on this runner, so this is an environment finding, not a soundness verdict"
+            fi
+            exit "$rc"
+          }
 
       - name: Gate unit tests
+        timeout-minutes: 5
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s scripts -p 'test_*.py' -v
 
       - name: Axiom, sorry and README census gate (kernel-checked)
+        timeout-minutes: 30
         shell: bash
         run: |
           set -euo pipefail
           # --slot-wait: the probe batches queue for a build slot instead of
-          # sprawling over the host unleased. A refusal exits 2 -- red, not passed.
+          # sprawling over the host unleased. A refusal exits 2.
+          # Exit 75 is its own answer: the kernel pass could not ask every
+          # declaration even after splitting each walled batch, so this run
+          # carries NO soundness verdict. It stays red -- the receipts on the
+          # blog must not rest on a partial pass -- but it is labelled as a
+          # retry, never as 80 findings against theorems nobody checked.
+          rc=0
           python3 scripts/audit_axioms.py --check --verify-kernel --slot-wait 900 \
-            --json "${RUNNER_TEMP:-/tmp}/axiom-audit.json"
+            --json "${RUNNER_TEMP:-/tmp}/axiom-audit.json" || rc=$?
+          if [ "$rc" -eq 75 ]; then
+            echo "::error title=Kernel pass incomplete (retry, not unsound)::the axiom gate finished its static half but the kernel never answered every declaration. Re-run this workflow; treat the corpus as unverified, not as failed."
+          fi
+          exit "$rc"

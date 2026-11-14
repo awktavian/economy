@@ -245,11 +245,15 @@ jobs:
         with:
           persist-credentials: false
       - name: Build and gate
+        timeout-minutes: 30
         shell: bash
         run: |
           set -euo pipefail
           lake build Economy
-          python3 scripts/audit_axioms.py --check --verify-kernel --slot-wait 900
+          rc=0
+          python3 scripts/audit_axioms.py --check --verify-kernel --slot-wait 900 || rc=$?
+          if [ "$rc" -eq 75 ]; then echo "kernel incomplete"; fi
+          exit "$rc"
 """
 
 
@@ -500,6 +504,7 @@ class CiInvariants(Fixture):
     def test_sibling_ratchet_job_coexists(self):
         """The native-trust ratchet job that landed on main beside this gate."""
         sibling = """      - name: Native-trust census ratchet
+        timeout-minutes: 10
         shell: bash
         run: |
           set -euo pipefail
@@ -518,6 +523,15 @@ class CiInvariants(Fixture):
         text = good_ci().replace("      - name: Build and gate",
                                  sibling + "      - name: Build and gate")
         self.assertEqual(self.ci(text), [])
+
+    def test_gate_step_without_timeout_minutes_is_refused(self):
+        text = good_ci().replace("        timeout-minutes: 30\n", "")
+        self.assertTrue(any("step-level timeout-minutes" in v for v in self.ci(text)),
+                        self.ci(text))
+
+    def test_kernel_step_without_exit_75_is_refused(self):
+        text = good_ci().replace('if [ "$rc" -eq 75 ]; then echo "kernel incomplete"; fi\n', "")
+        self.assertTrue(any("exit 75" in v for v in self.ci(text)), self.ci(text))
 
 
 # --------------------------------------------------------------------------
@@ -888,10 +902,15 @@ class FakeSubprocess(object):
     TimeoutExpired = subprocess.TimeoutExpired
     CompletedProcess = subprocess.CompletedProcess
 
-    def __init__(self, acquire_rc=0, acquire_out=None, probe_rc=0):
+    def __init__(self, acquire_rc=0, acquire_out=None, probe_rc=0,
+                 wall_above=None):
         self.acquire_rc = acquire_rc
         self.acquire_out = acquire_out
         self.probe_rc = probe_rc
+        # A batch with MORE than this many `#print axioms` lines is killed by the
+        # wall bound instead of answered — the shape of a busy host, where a big
+        # probe is the one that runs out of clock.
+        self.wall_above = wall_above
         self.verbs = []          # "acquire" / "release", in order
         self.acquire_argv = None
         self.release_argv = None
@@ -932,6 +951,10 @@ class FakeSubprocess(object):
                 lines.append("'%s' depends on axioms: "
                              "[propext, Classical.choice, Quot.sound]"
                              % line.split(" ", 2)[2])
+        if self.wall_above is not None and len(lines) > self.wall_above:
+            # timeout(1) kills it: rc 124, and whatever it had printed so far.
+            return subprocess.CompletedProcess(
+                argv, 124, "\n".join(lines[:1]), "killed by the wall bound")
         return subprocess.CompletedProcess(argv, self.probe_rc, "\n".join(lines), "")
 
 
@@ -1138,6 +1161,199 @@ class ProbeBatchCommand(SubprocessPatched):
         self.assertEqual(found, {"Economy.a": ["propext", "Classical.choice",
                                                "Quot.sound"]})
         self.assertEqual((unknown, errors, notes), ([], [], []))
+
+
+class WalledBatches(SubprocessPatched):
+    """A wall bound is a host condition, never a verdict about the corpus.
+
+    Measured 2026-11-14: with this repository's own CI kernel leg running the
+    same pass on the same host, probe batch 3 of 80 declarations passed its 300s
+    bound (rc=124, whole pass 842.20s). The gate then published 81 violations
+    reading like an unsound corpus, and MATH.json demotions are keyed on exactly
+    that shape. These cases pin the two halves of the cure: a walled batch is
+    split and retried, and what is still unanswered exits EX_TEMPFAIL as
+    unverified.
+    """
+
+    def test_a_walled_batch_is_split_and_retried(self):
+        fake = self.install(wall_above=2)
+        status = {}
+        names = ["Economy.a", "Economy.b", "Economy.c", "Economy.d"]
+        found, _u, errors, _n = self.audit(names, batch=4, status=status)
+        self.assertEqual(sorted(found), sorted(names))
+        self.assertEqual(errors, [])
+        self.assertEqual(status["lost"], [])
+        self.assertEqual(status["splits"], 1)
+        # 4 walled, then the two halves of 2 each answered
+        self.assertEqual(len(fake.probes), 3)
+
+    def test_the_retried_halves_carry_the_same_declarations(self):
+        fake = self.install(wall_above=1)
+        status = {}
+        names = ["Economy.a", "Economy.b", "Economy.c", "Economy.d"]
+        found, _u, _e, _n = self.audit(names, batch=4, status=status)
+        self.assertEqual(sorted(found), sorted(names))
+        sizes = []
+        for argv in fake.probes:
+            with open(argv[-1], encoding="utf-8") as fh:
+                body = fh.read()
+            sizes.append(len([n for n in names if n in body]))
+        sizes = []
+        for argv in fake.probes:
+            with open(argv[-1], encoding="utf-8") as fh:
+                body = fh.read()
+            sizes.append(len([n for n in names if n in body]))
+        # One batch of 4 walled, then the two halves of 2 — each of which walled
+        # too and was retried as singles. Seven compiler runs, all four answers.
+        self.assertEqual(sorted(sizes), [1, 1, 1, 1, 2, 2, 4])
+        self.assertEqual(status["splits"], 3)
+        self.assertEqual(status["lost"], [])
+        # A split is retried before its sibling is attempted, so the first answer
+        # comes back from a small chunk on a host that is slow rather than wedged.
+        self.assertEqual(sizes[0], 4)
+        self.assertEqual(sizes[1], 2)
+        self.assertEqual(sizes[2], 1)
+
+    def test_splitting_stops_at_one_declaration(self):
+        fake = self.install(probe_rc=124)
+        status = {}
+        found, _u, errors, _n = self.audit(["Economy.a"], batch=1, status=status)
+        self.assertEqual(found, {})
+        self.assertEqual(status["lost"], ["Economy.a"])
+        self.assertEqual(status["splits"], 0)
+        self.assertEqual(len(fake.probes), 1)
+        self.assertTrue(errors[0].startswith(A.WALL_TAG), errors)
+        self.assertIn("wall bound", errors[0])
+
+    def test_a_deep_split_terminates_and_names_every_declaration_once(self):
+        fake = self.install(probe_rc=124)
+        status = {}
+        names = ["Economy.n%d" % i for i in range(8)]
+        found, _u, errors, _n = self.audit(names, batch=8, status=status)
+        self.assertEqual(found, {})
+        self.assertEqual(sorted(status["lost"]), sorted(names))
+        # 8, then 4+4, then four pairs, then eight singles: 1+2+4+8
+        self.assertEqual(len(fake.probes), 15)
+        self.assertEqual(status["splits"], 7)
+        self.assertEqual(len(errors), 8)
+        self.assertEqual(len(status["walls"]), 15)
+
+    def test_each_attempt_takes_and_releases_its_own_lease(self):
+        fake = self.install(wall_above=1)
+        self.audit(["Economy.a", "Economy.b"], batch=2, status={})
+        self.assertEqual(fake.verbs, ["acquire", "release"] * len(fake.probes))
+
+    def test_a_wall_never_becomes_a_soundness_violation(self):
+        names = ["Economy.a", "Economy.b"]
+        c = _census_of(names)
+        found, unknown, notes = {}, [], []
+        errors = [A.WALL_TAG + "probe batch #1 hit its 300s wall bound (rc=124)"]
+        v = A.kernel_violations(c, found, unknown, errors, notes, lost=names)
+        self.assertEqual(v, [], "a host that was too slow must not indict theorems")
+        # Without the lost set the same pass DOES report the declarations as
+        # unanswered, which is the shape the fix removes: two findings claiming
+        # the kernel was never consulted are the gate's failure, not the corpus's.
+        without = A.kernel_violations(c, found, unknown, errors, notes)
+        self.assertEqual(len(without), 2, without)
+        self.assertTrue(all(A.WALL_TAG not in x for x in without), without)
+        self.assertTrue(any("no `#print axioms` answer" in x for x in without),
+                        without)
+
+    def test_answers_outside_the_allowed_set_are_still_violations(self):
+        names = ["Economy.a"]
+        c = _census_of(names)
+        v = A.kernel_violations(c, {"Economy.a": ["sorryAx"]}, [], [], [],
+                                lost=[])
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("sorryAx", v[0])
+
+
+class KernelIncompleteVerdict(SubprocessPatched):
+    """The gate's third outcome: it ran, and it does not know."""
+
+    def install_wall(self, lost):
+        real = A.run_kernel_audit
+
+        def fake_audit(root, names, **kw):
+            st = kw.get("status")
+            if st is not None:
+                st["lost"] = list(lost)
+                st["walls"] = ["probe batch #1 hit its 300s wall bound (rc=124)"]
+                st["splits"] = 2
+            return ({nm: list(A.ALLOWED_AXIOMS) for nm in names if nm not in lost},
+                    [], [A.WALL_TAG + "probe batch #1 hit its 300s wall bound"], [])
+
+        A.run_kernel_audit = fake_audit
+        self.addCleanup(setattr, A, "run_kernel_audit", real)
+
+    def test_evaluate_exits_tempfail_when_the_kernel_was_not_asked(self):
+        c = A.census(REPO_ROOT)
+        lost = [c["public_kernel"][0].full]
+        self.install_wall(lost)
+        rc, _c, report = A.evaluate(REPO_ROOT, verify_kernel=True,
+                                   skip_readme=True, skip_ci=True)
+        self.assertEqual(rc, A.EX_TEMPFAIL, report["violations"])
+        self.assertEqual(report["rc"], A.EX_TEMPFAIL)
+        self.assertEqual(report["violations"], [],
+                         "unverified declarations are not findings about them")
+        self.assertEqual(report["kernel_lost"], lost)
+        self.assertEqual(report["kernel_splits"], 2)
+
+    def test_a_real_violation_outranks_the_retry_signal(self):
+        real = A.run_kernel_audit
+
+        def fake_audit(root, names, **kw):
+            st = kw.get("status")
+            if st is not None:
+                st["lost"] = []
+            return ({nm: ["sorryAx"] for nm in names}, [], [], [])
+
+        A.run_kernel_audit = fake_audit
+        self.addCleanup(setattr, A, "run_kernel_audit", real)
+        rc, _c, report = A.evaluate(REPO_ROOT, verify_kernel=True,
+                                    skip_readme=True, skip_ci=True)
+        self.assertEqual(rc, 1, report["violations"][:3])
+
+    def test_the_json_never_calls_an_incomplete_pass_clean(self):
+        c = A.census(REPO_ROOT)
+        lost = [c["public_kernel"][0].full]
+        self.install_wall(lost)
+        _rc, _c, report = A.evaluate(REPO_ROOT, verify_kernel=True,
+                                     skip_readme=True, skip_ci=True)
+        out = os.path.join(self.tmp, "incomplete.json")
+        A.emit_json(out, REPO_ROOT, c, report)
+        with open(out, encoding="utf-8") as fh:
+            d = json.load(fh)
+        self.assertFalse(d["clean"], "an unfinished kernel pass is not a clean one")
+        self.assertTrue(d["kernel_incomplete"])
+        self.assertEqual(d["kernel_unverified_declarations"], lost)
+        self.assertEqual(d["exit_code"], A.EX_TEMPFAIL)
+        self.assertEqual(d["violations"], [])
+
+    def test_the_cli_says_incomplete_rather_than_clean(self):
+        import contextlib
+        import io
+        c = A.census(REPO_ROOT)
+        self.install_wall([c["public_kernel"][0].full])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = A.main(["--root", REPO_ROOT, "--check", "--verify-kernel",
+                         "--skip-readme", "--skip-ci", "--quiet"])
+        out = buf.getvalue()
+        self.assertEqual(rc, A.EX_TEMPFAIL)
+        self.assertIn("INCOMPLETE", out)
+        self.assertNotIn("CLEAN", out)
+        self.assertIn("NO soundness verdict", out)
+
+
+def _census_of(names):
+    """A census-shaped dict for kernel_violations, with no corpus involved."""
+    return {"public_kernel": [_Decl(n) for n in names]}
+
+
+class _Decl(object):
+    def __init__(self, full):
+        self.full = full
 
 
 if __name__ == "__main__":

@@ -113,14 +113,37 @@ LOCKS_DIR_ENV = "KAGAMI_LOCKS_DIR"
 DEFAULT_LOCKS_DIR = "/tmp/kagami-locks"
 SLOT_WAIT = 180  # seconds to wait for a free build slot
 PROBE_UNLEASED_S = 120  # estate bound on an unleased `lake env lean`
-# Measured 2026-11-13 at head bac6a9e3 (18-core host, warm caches): the whole
-# `--verify-kernel` pass ran 4 batches over the public declarations in 109.44s
-# wall with the host idle, and 273.48s under real contention -- one batch then
-# spent 171.5s waiting for a slot and still finished inside its bound. No batch
-# has ever come near 300s, so this is a backstop, not a schedule: it is small
-# enough that `batches x bound` stays inside the CI job's 45-minute ceiling,
-# where a hung batch reports a violation instead of being killed silently.
+# Measured twice on the same 18-core estate host with warm caches. Idle, the
+# whole `--verify-kernel` pass is 4 batches over the public declarations in
+# 109.44s at head bac6a9e3, and 273.48s under contention, where one batch spent
+# 171.5s waiting for a slot and still finished inside its bound. The bound was
+# then broken, by this repository's own CI: on 2026-11-14, with the CI kernel
+# leg running the same pass on the same host, batch 3 (80 declarations) passed
+# 300s without answering -- rc=124, whole pass 842.20s, and lake reported
+# `batteries: repository has local changes` on `.lake/packages/batteries`, which
+# is a symlink into the machine-wide cache. That gate then printed 81 violations
+# reading like an unsound corpus, when the kernel had simply never been asked.
+#
+# So 300s is a bound a busy host CAN exceed while nothing is wrong with the
+# corpus. It stays small because `batches x bound` must fit the CI job's
+# 45-minute ceiling, and what changed is what a wall means: a walled batch is
+# split and retried, and a wall that survives splitting down to one declaration
+# exits EX_TEMPFAIL as unverified, never as a soundness verdict.
 PROBE_LEASED_S = 300  # backstop while a slot is held
+#: A walled batch is halved and retried until the chunk is this small; at one
+#: declaration there is nothing left to split, so it is reported unverified.
+WALL_SPLIT_FLOOR = 1
+#: Cap on the split depth of one lineage (80 -> 40 -> 20 -> 10 -> 5 -> 2 -> 1),
+#: so a wedged compiler cannot make the pass grow without bound.
+WALL_SPLIT_DEPTH = 7
+#: Prefix on an error that means "the compiler did not answer", as opposed to
+#: "the kernel answered and the answer is bad". Readers route on this: the first
+#: is a host condition worth retrying, the second is a soundness red.
+WALL_TAG = "kernel-incomplete: "
+#: EX_TEMPFAIL. The gate exits this when the kernel pass could not be completed:
+#: no soundness verdict was produced, and CI must not be read as either green or
+#: red on the corpus. The estate already uses 75 for "queue and retry".
+EX_TEMPFAIL = 75
 
 #: Kinds the kernel can be asked about with `#print axioms`.
 KERNEL_KINDS = ("theorem", "lemma")
@@ -784,18 +807,88 @@ def ci_violations(root, text=None):
         for m in re.finditer(r'"[^"\n]*`[^"\n]*"', step):
             v.append("ci.yml: backticks inside a double-quoted string execute as a "
                      "command: %s" % m.group(0).strip()[:80])
+
+    # A ceiling on the JOB is not a ceiling on a STEP. Cancellation is a
+    # job-level act: when run 43547320929's cache step ran past the 45-minute
+    # job bound the whole job concluded `cancelled`, every step after it was
+    # `skipped`, and the repository had no verdict at all -- the fourth such run
+    # in a row. A step that runs a soundness-deciding command must carry its own
+    # `timeout-minutes` so it reports its own name and the run keeps the
+    # verdicts of the steps that already passed.
+    for block in step_blocks(text):
+        if not is_gate_step(block):
+            continue
+        if "timeout-minutes" in block:
+            continue
+        label = re.search(r"- name:\s*(.+)", block)
+        v.append("ci.yml: gate step has no step-level timeout-minutes, so a slow "
+                 "command here is cancelled by the job ceiling and discards the "
+                 "verdicts of every other step: %s"
+                 % (label.group(1).strip()[:70] if label else block.splitlines()[0][:70]))
+    # And the kernel pass's third answer must be named in the workflow: a run
+    # that could not ask the kernel is a retry, not an indictment of 80 theorems.
+    for block in step_blocks(text):
+        if "audit_axioms.py" not in block or "--verify-kernel" not in block:
+            continue
+        if "-eq 75" not in block and "-eq ${rc}" not in block \
+                and "eq 75" not in block:
+            v.append("ci.yml: the kernel gate does not name exit 75. A kernel pass "
+                     "that could not ask every declaration on a busy host is "
+                     "incomplete, and a reader must be able to tell that apart "
+                     "from the kernel answering and finding something wrong.")
     return v
 
 
+def step_blocks(text):
+    """The YAML step blocks, as lists of lines, in file order.
+
+    Deliberately textual rather than a YAML parse: this gate must run on a host
+    with no pyyaml, and the shape it cares about (`- name:` / `- uses:` at the
+    step indent, until the next step) is stable. The returned blocks include
+    each step's own keys, which is where `timeout-minutes` for a step lives.
+    """
+    blocks = []
+    cur = None
+    for line in text.splitlines():
+        if re.match(r"^      - (name|uses):", line):
+            if cur:
+                blocks.append(cur)
+            cur = [line]
+        elif cur is not None:
+            if re.match(r"^    [a-zA-Z_]+:", line) or re.match(r"^  \S", line):
+                blocks.append(cur)
+                cur = None
+            else:
+                cur.append(line)
+    if cur:
+        blocks.append(cur)
+    return ["\n".join(b) for b in blocks]
+
+
 def cache_get_guarded(text):
-    """True when every `lake exe cache get` sits behind a symlink test."""
-    for idx in [m.start() for m in re.finditer(r"lake exe cache get", text)]:
-        window = text[max(0, idx - 2000):idx]
-        if not re.search(r"\[\s*-L\s", window):
+    """True when no `lake exe cache get` can run against a symlinked prefix.
+
+    Two shapes are protected. The old one: the step itself probes the package
+    dirs for symlinks (`-L` plus a LINKED decision) and seeds only on a real
+    directory. The new one: the step first runs scripts/warm_cache.py, whose
+    contract is to bind the estate generation and REFUSE when it cannot prove
+    the bind safe, so the fetch sits on the refusal branch and runs only where
+    nothing is symlinked. Anything else is unprotected.
+
+    A fetch living outside any step body is also unprotected: it would be a
+    top-level key or a comment we failed to see, and guessing is not a guard.
+    """
+    blocks = step_blocks(text)
+    for block in blocks:
+        if "lake exe cache get" not in block:
+            continue
+        upper = block.upper()
+        probed = re.search(r"\[\s*-L\s", block) and "LINKED" in upper
+        bound = "WARM_CACHE.PY" in upper
+        if not (probed or bound):
             return False
-        if "LINKED" not in window.upper():
-            return False
-    return True
+    outside = sum(block.count("lake exe cache get") for block in blocks)
+    return outside == len(re.findall(r"lake exe cache get", text))
 
 
 def run_steps(text):
@@ -959,7 +1052,7 @@ def _timeout_wrapper():
 
 def run_kernel_audit(root, names, batch=80, timeout=None, log=None, lake=None,
                      tmpdir=None, extra_opts=None, slot_wait=None, use_slot=True,
-                     slot_script=None):
+                     slot_script=None, status=None):
     """Ask the kernel for every axiom profile. Returns (found, unknown, errors, notes).
 
     Batches are separate compiler runs: a Lean parse error stops the compiler
@@ -970,8 +1063,22 @@ def run_kernel_audit(root, names, batch=80, timeout=None, log=None, lake=None,
     `lean-build-slot.py` lease taken per batch and released between batches:
     `lake env lean` is invisible to the slot cap, and an unleased probe
     competes with every admitted `lake build` on the host.
+
+    A batch that reaches its wall bound is not evidence about the corpus. It is
+    halved and retried, down to WALL_SPLIT_FLOOR, because the honest reading of
+    a slow batch on a busy host is "these declarations were not asked yet", not
+    "these theorems are unsound". Whatever is left unanswered when splitting is
+    exhausted is reported through `status` — `status["lost"]` (declarations the
+    kernel never answered), `status["walls"]` (one line per wall) and
+    `status["splits"]` (how often the host was too slow) — and the caller turns
+    that into EX_TEMPFAIL, a retry, rather than a soundness red.
     """
     log = log or (lambda msg: None)
+    if status is None:
+        status = {}
+    status.setdefault("lost", [])
+    status.setdefault("walls", [])
+    status.setdefault("splits", 0)
     lake = lake or shutil.which("lake")
     if not lake:
         raise RuntimeError("lake not on PATH")
@@ -986,56 +1093,88 @@ def run_kernel_audit(root, names, batch=80, timeout=None, log=None, lake=None,
     own_tmp = tmpdir is None
     tmpdir = tmpdir or tempfile.mkdtemp(prefix="economy-axiom-audit-")
     try:
-        total_batches = (len(names) + batch - 1) // max(1, batch)
-        for n, chunk in enumerate(chunked(names, batch), start=1):
-            probe = os.path.join(tmpdir, "AxiomProbe%d.lean" % n)
+        queue = [[list(chunk), 0] for chunk in chunked(names, batch)]
+        seq = 0
+        while queue:
+            chunk, depth = queue.pop(0)
+            seq += 1
+            probe = os.path.join(tmpdir, "AxiomProbe%d.lean" % seq)
             with open(probe, "w", encoding="utf-8") as fh:
                 fh.write(build_probe_source(chunk))
             lease = BuildSlot(root, wait=slot_wait, log=log, enabled=use_slot,
                               script=slot_script)
+            walled = None
             with lease:
                 bound = timeout if timeout is not None else (
                     PROBE_LEASED_S if lease.held else PROBE_UNLEASED_S)
                 argv = (list(wrapper) + [str(bound)] if wrapper else []) + \
                     [lake, "-d", root, "env", "lean"] + opts + [probe]
-                log("  probe batch %d/%d (%d declarations, <=%ds%s)"
-                    % (n, max(1, total_batches), len(chunk), bound,
-                       ", slot held" if lease.held else ""))
+                log("  probe batch #%d (%d declarations, <=%ds%s%s)"
+                    % (seq, len(chunk), bound,
+                       ", slot held" if lease.held else "",
+                       ", split depth %d" % depth if depth else ""))
                 try:
                     proc = subprocess.run(argv, cwd=root, capture_output=True,
                                           text=True, timeout=bound + 60)
                 except subprocess.TimeoutExpired:
-                    errors.append("probe batch %d timed out after %ds" % (n, bound))
-                    continue
+                    walled = "probe batch #%d timed out in the harness after %ds" \
+                             % (seq, bound + 60)
+                    tail = ""
                 except OSError as exc:
                     raise RuntimeError("cannot run %s: %s" % (argv[0], exc))
-            if proc.returncode in (124, 137):
-                errors.append("probe batch %d hit its %ds wall bound (rc=%d): %s"
-                              % (n, bound, proc.returncode,
-                                 (proc.stdout + proc.stderr).strip()[:200]))
-                continue
-            out, unk, errs = parse_probe_output(proc.stdout + "\n" + proc.stderr)
-            found.update(out)
-            unknown.extend(unk)
-            errors.extend(errs)
-            if not out and not unk:
-                notes.append("probe batch %d produced no axiom profile (rc=%d): %s"
-                             % (n, proc.returncode,
-                                (proc.stdout + proc.stderr).strip()[:200]))
+                else:
+                    if proc.returncode in (124, 137):
+                        walled = "probe batch #%d hit its %ds wall bound (rc=%d)" \
+                                 % (seq, bound, proc.returncode)
+                        tail = (proc.stdout + proc.stderr).strip()[:200]
+                if walled is None:
+                    out, unk, errs = parse_probe_output(
+                        proc.stdout + "\n" + proc.stderr)
+                    found.update(out)
+                    unknown.extend(unk)
+                    errors.extend(errs)
+                    if not out and not unk:
+                        notes.append(
+                            "probe batch #%d produced no axiom profile (rc=%d): %s"
+                            % (seq, proc.returncode,
+                               (proc.stdout + proc.stderr).strip()[:200]))
+            if walled is not None:
+                status["walls"].append("%s: %s" % (walled, tail) if tail else walled)
+                if len(chunk) > WALL_SPLIT_FLOOR and depth < WALL_SPLIT_DEPTH:
+                    mid = len(chunk) // 2
+                    queue[:0] = [[chunk[:mid], depth + 1], [chunk[mid:], depth + 1]]
+                    status["splits"] += 1
+                    log("  %s — %d declarations split into %d+%d and retried"
+                        % (walled, len(chunk), mid, len(chunk) - mid))
+                    continue
+                status["lost"].extend(chunk)
+                errors.append("%s%s, and %d declaration(s) remain unverified: %s"
+                              % (WALL_TAG, walled, len(chunk),
+                                 ", ".join(chunk[:8])))
     finally:
         if own_tmp:
             shutil.rmtree(tmpdir, ignore_errors=True)
     return found, unknown, errors, notes
 
 
-def kernel_violations(c, found, unknown, errors, notes):
+def kernel_violations(c, found, unknown, errors, notes, lost=()):
+    """Soundness verdicts from a kernel pass.
+
+    `lost` is the set of declarations the compiler never answered because its
+    batches hit the wall bound. They are NOT violations: `#print axioms` was
+    never asked, so there is no evidence either way, and listing them as
+    violations would let a busy host demote the corpus with 80 fabricated
+    soundness findings. They surface as EX_TEMPFAIL instead, by way of the
+    caller, and the gate stays unable to say CLEAN.
+    """
     v = []
     allowed = set(ALLOWED_AXIOMS)
+    silent = set(lost)
     expected = [d.full for d in c["public_kernel"]]
     for nm in sorted(set(unknown)):
         v.append("kernel: `%s` is not a live declaration (the census is stale)" % nm)
     for nm in expected:
-        if nm not in found:
+        if nm not in found and nm not in silent:
             v.append("kernel: no `#print axioms` answer for `%s`" % nm)
     for nm in sorted(set(found) - set(expected)):
         v.append("kernel: answered for `%s`, which the static census does not list" % nm)
@@ -1046,7 +1185,7 @@ def kernel_violations(c, found, unknown, errors, notes):
                          % (nm, ax, ", ".join(ALLOWED_AXIOMS)))
     for nt in notes:
         v.append("kernel: %s" % nt)
-    for e in errors[:20]:
+    for e in [e for e in errors if not e.startswith(WALL_TAG)][:20]:
         v.append("kernel: %s" % e)
     return v
 
@@ -1059,30 +1198,47 @@ def kernel_violations(c, found, unknown, errors, notes):
 def evaluate(root, verify_kernel=False, skip_readme=False, skip_ci=False,
              batch=80, timeout=None, lake=None, log=None,
              slot_wait=None, use_slot=True, slot_script=None):
-    """Run the requested gates. Returns (exit_code, census, report)."""
+    """Run the requested gates. Returns (exit_code, census, report).
+
+    0 CLEAN, 1 violations, 2 the gate could not run, and EX_TEMPFAIL (75) when
+    the kernel pass ran but a busy host kept it from asking every declaration:
+    no verdict either way, so a retry is the only honest next step.
+    """
     c = census(root)
-    report = {"violations": [], "found": {}, "notes": [], "kernel": False, "rc": 0}
+    report = {"violations": [], "found": {}, "notes": [], "kernel": False, "rc": 0,
+              "kernel_lost": [], "kernel_walls": [], "kernel_splits": 0}
     report["violations"].extend(static_violations(root, c))
     if not skip_readme:
         report["violations"].extend(readme_violations(root, c))
     if not skip_ci:
         report["violations"].extend(ci_violations(root))
     if verify_kernel:
+        status = {}
         try:
             found, unknown, errors, notes = run_kernel_audit(
                 root, [d.full for d in c["public_kernel"]], batch=batch,
                 timeout=timeout, log=log, lake=lake,
                 slot_wait=slot_wait, use_slot=use_slot,
-                slot_script=slot_script)
+                slot_script=slot_script, status=status)
         except RuntimeError as exc:
             return 2, c, {"violations": ["gate cannot run: %s" % exc],
-                          "found": {}, "notes": [], "kernel": False, "rc": 2}
+                          "found": {}, "notes": [], "kernel": False, "rc": 2,
+                          "kernel_lost": [], "kernel_walls": [], "kernel_splits": 0}
         report["found"] = found
         report["errors"] = errors
         report["notes"] = notes
         report["kernel"] = True
-        report["violations"].extend(kernel_violations(c, found, unknown, errors, notes))
-    report["rc"] = 1 if report["violations"] else 0
+        report["kernel_lost"] = list(status.get("lost") or [])
+        report["kernel_walls"] = list(status.get("walls") or [])
+        report["kernel_splits"] = int(status.get("splits") or 0)
+        report["violations"].extend(kernel_violations(
+            c, found, unknown, errors, notes, lost=report["kernel_lost"]))
+    if report["violations"]:
+        report["rc"] = 1
+    elif report["kernel_lost"]:
+        report["rc"] = EX_TEMPFAIL
+    else:
+        report["rc"] = 0
     return report["rc"], c, report
 
 
@@ -1101,7 +1257,15 @@ def emit_json(path, root, c, report):
         "public_kernel_decls": c["counts"]["public_kernel_decls"],
         "violations": report["violations"],
         "notes": report["notes"],
-        "clean": not report["violations"],
+        # A wall bound is a host condition, not a verdict. `clean` means the
+        # kernel answered for every declaration it was asked about AND nothing
+        # was outside the allowed set; a pass that lost declarations is neither
+        # clean nor dirty, it is incomplete, and `kernel_incomplete` says so.
+        "kernel_incomplete": bool(report.get("kernel_lost")),
+        "kernel_unverified_declarations": sorted(report.get("kernel_lost") or []),
+        "kernel_wall_bound_events": list(report.get("kernel_walls") or []),
+        "kernel_batches_split": int(report.get("kernel_splits") or 0),
+        "clean": (not report["violations"]) and not report.get("kernel_lost"),
         "exit_code": report["rc"],
     }
     with open(path, "w", encoding="utf-8") as fh:
@@ -1209,10 +1373,27 @@ def main(argv=None):
         else:
             print("CLEAN: 0 sorry, 0 native_decide, 0 user axioms; README census and CI "
                   "wiring pinned")
+    elif rc == EX_TEMPFAIL:
+        lost = report.get("kernel_lost") or []
+        print("INCOMPLETE (exit %d): the static gate is clean but the kernel was never "
+              "asked for %d of %d public declarations — their probe batches hit the wall "
+              "bound even after splitting. This run carries NO soundness verdict: the "
+              "corpus is neither certified nor indicted. Retry on a quieter host."
+              % (EX_TEMPFAIL, len(lost), counts["public_kernel_decls"]))
+        for w in (report.get("kernel_walls") or [])[:5]:
+            print("  wall: %s" % w)
+        for nm in sorted(lost)[:10]:
+            print("  unverified: %s" % nm)
+        if len(lost) > 10:
+            print("  ... %d more unverified" % (len(lost) - 10))
     else:
         print("VIOLATIONS (%d):" % len(report["violations"]))
         for item in report["violations"]:
             print("  - %s" % item)
+        lost = report.get("kernel_lost") or []
+        if lost:
+            print("  (and %d declaration(s) the kernel never answered — see the "
+                  "wall lines above; they are unverified, not violations)" % len(lost))
     if report["notes"] and not args.verify_kernel:
         for nt in report["notes"]:
             print("  note: %s" % nt)
