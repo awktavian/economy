@@ -749,6 +749,16 @@ def ci_violations(root, text=None):
             "ci.yml: `lake exe cache get` runs without a symlink preflight; when "
             ".lake/packages/* are symlinks it writes through into the machine-wide cache"
         )
+    # Invisible to every other check here: the cache call lives inside the
+    # action, so no preflight written in this file can guard it.
+    if "leanprover/lean-action" in text:
+        v.append(
+            "ci.yml: leanprover/lean-action calls `lake exe cache get` inside "
+            "the action, where no preflight in this file can guard it: on this "
+            "estate that writes through the machine-wide Mathlib cache, and it "
+            "burned the whole job ceiling in run 43527300771. Build in a step "
+            "that probes .lake/packages first."
+        )
     if "persist-credentials: false" not in text:
         v.append("ci.yml: actions/checkout must not persist credentials")
     if "timeout-minutes" not in text:

@@ -463,6 +463,21 @@ class CiInvariants(Fixture):
         self.assertTrue(any("execute as a command" in v for v in self.ci(text)),
                         self.ci(text))
 
+    def test_lean_action_is_refused(self):
+        # The cache call is inside the action, so the file's own preflight
+        # cannot cover it, and the runner cannot see the symlink it writes
+        # through. This is what cancelled run 43527300771 at 30 minutes.
+        text = good_ci() + "      - uses: leanprover/lean-action@v1\n"
+        self.assertTrue(any("leanprover/lean-action" in v for v in self.ci(text)),
+                        self.ci(text))
+
+    def test_lean_action_named_only_in_a_comment_is_not_a_call(self):
+        text = good_ci().replace(
+            "      - name: Build and gate",
+            "      # leanprover/lean-action would seed the cache unguarded\n"
+            "      - name: Build and gate")
+        self.assertEqual(self.ci(text), [])
+
     def test_a_retry_on_a_non_gate_command_is_not_a_swallowed_verdict(self):
         # `|| true` is a defect when it guards a verdict. On a `git fetch`
         # before a read from another repo's object store it is just a retry,

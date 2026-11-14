@@ -12,7 +12,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  # Renamed from `build` on 2026-11-13: this job never built anything that
+  # survived contact with the runner. It is the native-trust census leg now,
+  # which is a text scan; the corpus build lives in `soundness`.
+  native-trust:
+    name: Native-trust census ratchet
     runs-on: [self-hosted, lean]
     timeout-minutes: 30
     steps:
@@ -48,7 +52,17 @@ jobs:
             echo "::warning::native-trust census UNMEASURED on this runner: no reality checkout at $R carrying scripts/native_decide_census.py with --ratchet; the ratchet did not run here"
           fi
 
-      - uses: leanprover/lean-action@v1
+      # The corpus build moved to the `soundness` job, where it runs behind a
+      # symlink preflight and a build-slot lease on the toolchain this runner
+      # already pins. `leanprover/lean-action@v1` was the wedge, not a slow
+      # step: run 43527300771 spent 885566ms (14m45s) inside the action's own
+      # `lake exe cache get`, reached the 30-minute job ceiling, and the run
+      # concluded `cancelled` with this ratchet step's PASS (2m03s, undisclosed
+      # 0 == baseline 0) discarded by the job-level cancellation. That action
+      # seeds the Mathlib cache with no preflight, and on this estate
+      # `.lake/packages/*` are symlinks into the machine-wide cache every other
+      # build reads -- so the download wrote through shared state. The ratchet
+      # needs no toolchain; it is a text scan, seconds.
 
   soundness:
     # Self-hosted: elan and the toolchain pinned by lean-toolchain are already
