@@ -57,9 +57,18 @@
   identity at `calBEA2026`, where the base-horizon exposure is `1/12`.
 
   BRIDGE: `Scenario.fromCalibration` wires a calibration into the forward-time
-  scenario. Two theorems say what the bridge carries (B1, field-by-field,
-  definitional exposure) and what it preserves that the `Scenario` type does
-  not require (B2, the strict base-below-saturation horizon ordering).
+  scenario. Four theorems govern it: B1 says what the bridge carries
+  field-by-field (definitional exposure), B2 what it preserves that the
+  `Scenario` type does not require (the strict base-below-saturation horizon
+  ordering), and B3-B4 pin the bridge's output, for the two BEA calibrations,
+  against the separately authored `metrFastScenario` and `metrBaselineScenario`
+  in `Economy.Forecast`. B1 compares the bridge with the calibration it reads,
+  so it stays true if the calibration's literals move; B3-B4 compare it with a
+  second copy of the same numbers, so they are the checks that redden when the
+  calibration layer and the forecast layer stop describing one economy.
+  `gdp_mono_in_β_slope_at_calibrations` then states the fast-over-baseline GDP
+  dominance at the calibration layer, which is what S1's docstring has always
+  claimed and its statement did not say.
 
   SOURCES: see REFERENCES.md for every number appearing below.
 
@@ -387,7 +396,10 @@ theorem edge_infinite_matching (s : ℝ) (_hs : 0 ≤ s) :
     lower doubling time) gives weakly higher log-GDP deviation at every
     t ≥ 0, under otherwise-identical scenarios. This is
     `metr_fast_dominates_baseline` abstracted to the parametric calibration:
-    `calBEA2026` (fast slope) dominates `calBaseline` (baseline slope). -/
+    `calBEA2026` (fast slope) dominates `calBaseline` (baseline slope) — that
+    calibration-level claim is stated where it is proved, as
+    `gdp_mono_in_β_slope_at_calibrations`, which consumes the B3/B4 bridge
+    pins. -/
 theorem gdp_mono_in_β_slope {t : ℝ} (ht : 0 ≤ t) :
     metrBaselineScenario.logGDPDeviation t ≤ metrFastScenario.logGDPDeviation t :=
   metr_fast_dominates_baseline ht
@@ -596,6 +608,51 @@ theorem fromCalibration_data_legs (c : ModelCalibration) :
 theorem fromCalibration_Hmin_lt_Hmax (c : ModelCalibration) :
     (Scenario.fromCalibration c).H₀ < (Scenario.fromCalibration c).Hmax :=
   c.H_min_lt_H_max
+
+/-- **B3. The bridge reproduces the forecast layer's own fast scenario
+    (THEOREM).** `metrFastScenario` is authored independently of
+    `calBEA2026` — it hardcodes `T = 4`, `H₀ = 1`, `Hmax = 12`, `α = 6/10`,
+    `gK = 3/1000` and `costSavings = 175/1000` with its own proofs — and the
+    corpus forecasts with that copy, not with the bridge. This pin says the
+    two copies still describe the same numbers, which is what B1 cannot check:
+    B1 relates the bridge to the calibration it reads and so survives any edit
+    to the calibration's literals, while this one reddens the first time
+    `calBEA2026` stops meaning the economy `Economy.Forecast` projects. It is
+    the calibration-layer sibling of the agreement checks already carried in
+    `RecessionShock`, `CapexBubble` and `JobSwapping`
+    (`recessionBEA2026_matches_calibration` and friends). Like those it buys
+    no new mathematics — five of the six data legs reduce by `rfl` — and the
+    sixth does not: `calBEA2026.doublingTime = 4` needs `doublingTime_metrFast`,
+    so this is labeled THEOREM, not exposure. -/
+theorem fromCalibration_calBEA2026_matches_metrFastScenario :
+    Scenario.fromCalibration calBEA2026 = metrFastScenario := by
+  unfold Scenario.fromCalibration metrFastScenario
+  congr
+  · exact doublingTime_metrFast
+
+/-- **B4. The baseline side of the same pin (THEOREM).** Bridging
+    `calBaseline` reproduces `metrBaselineScenario`, whose only difference
+    from the fast scenario is the doubling time (7 months, from
+    `metrBaselineSlope`). Together B3 and B4 say the bridge is how the two
+    METR slopes reach the forecast layer's own scenarios. -/
+theorem fromCalibration_calBaseline_matches_metrBaselineScenario :
+    Scenario.fromCalibration calBaseline = metrBaselineScenario := by
+  unfold Scenario.fromCalibration metrBaselineScenario
+  congr
+  · exact doublingTime_metrBaseline
+
+/-- **S1 at the calibration layer (THEOREM).** The fast calibration dominates
+    the baseline calibration in log-GDP deviation at every `t ≥ 0`, with the
+    scenarios built by the bridge rather than written out by hand. This is the
+    statement S1's docstring has always made; S1 itself only reaches the two
+    hardcoded scenarios. It consumes B3/B4, so the two pins are load-bearing
+    here and not merely regression detectors. -/
+theorem gdp_mono_in_β_slope_at_calibrations {t : ℝ} (ht : 0 ≤ t) :
+    (Scenario.fromCalibration calBaseline).logGDPDeviation t
+      ≤ (Scenario.fromCalibration calBEA2026).logGDPDeviation t := by
+  rw [fromCalibration_calBaseline_matches_metrBaselineScenario,
+      fromCalibration_calBEA2026_matches_metrFastScenario]
+  exact metr_fast_dominates_baseline ht
 
 end
 

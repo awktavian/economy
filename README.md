@@ -71,11 +71,11 @@ CI runs both, plus the gate's own unit tests, on every push to `main` and every 
 ```text
 # audit-census:begin
 lean_files: 28
-theorem_count: 270
+theorem_count: 273
 lemma_count: 3
 other_decl_count: 131
 private_decls: 3
-public_kernel_decls: 270
+public_kernel_decls: 273
 sorry_in_code: 0
 native_decide_in_code: 0
 user_axioms: 0
