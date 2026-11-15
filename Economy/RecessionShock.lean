@@ -37,7 +37,11 @@
   `recession_lower_envelope_nn`, `recession_drag_le_smooth`,
   `sahm_rule_implication`); NUMERICAL OBSERVATION for the NBER-anchored
   calibration numbers — their product (1.35% over 36 months) is an input
-  product, not a derived prediction.
+  product, not a derived prediction; DEFINITIONAL EXPOSURE for
+  `recessionBEA2026_matches_calibration` (agreement pin against
+  `Economy.Calibration`: both sides are literal constants that reduce by
+  `rfl`, so it guards two copies of one anchor rather than falsifying an
+  economic claim).
 -/
 import Economy.Forecast
 import Economy.Calibration
@@ -198,6 +202,24 @@ theorem recession_BEA_expected_36mo :
     recessionBEA2026.expectedCumLoss 36 = 135 / 10000 := by
   unfold RecessionParams.expectedCumLoss recessionBEA2026
   norm_num
+
+/-- **Agreement pin — recession triple — DEFINITIONAL EXPOSURE.** The hazard,
+    duration and per-month shock this file stores in `recessionBEA2026`
+    (0.015/mo, 10 mo, 0.0025/mo) and the three that `Economy.Calibration`
+    stores in `calBEA2026` (`recessionHazard`, `recessionDuration`,
+    `recessionShock`) are the same NBER anchor, authored twice. The
+    duplication is deliberate: the calibration layer's scenario bridge reads
+    none of these fields, so nothing derives one copy from the other and,
+    before this pin, nothing compared them either. Each leg closes by `rfl`,
+    which is the point — the day someone updates the anchor in one file and
+    not the other, this turns red instead of the corpus quietly publishing
+    two different recessions. An agreement check, not a validation theorem:
+    it says the parameters agree, not that the drag model is right. -/
+theorem recessionBEA2026_matches_calibration :
+    recessionBEA2026.lambda = calBEA2026.recessionHazard.val ∧
+    recessionBEA2026.duration = calBEA2026.recessionDuration.val ∧
+    recessionBEA2026.shockSize = calBEA2026.recessionShock.val :=
+  ⟨rfl, rfl, rfl⟩
 
 end
 

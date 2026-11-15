@@ -38,8 +38,11 @@
   `jobSwap_cesLimit_isCobbDouglas`, `jobSwap_welfare_lower_bound`, and
   `jobSwap_welfare_strict_mono_in_Lnon`; DEFINITIONAL EXPOSURE (rfl
   restatements of `cobbOutput`'s definition, not theorems) for
-  `jobSwap_cobbDouglas_floor` and `integrated_exposure_bounded`.
-  No sorry, no axiom, no placeholder.
+  `jobSwap_cobbDouglas_floor` and `integrated_exposure_bounded`; DEFINITIONAL
+  EXPOSURE for the equality legs of `jobSwapBEA2026_matches_calibration`
+  (agreement pins against `Economy.Calibration`) — its third leg is real
+  arithmetic, not a restatement: it derives the published 25% share from the
+  two bucket sizes actually fed to the nest.
 -/
 import Economy.CES
 import Economy.Calibration
@@ -236,6 +239,31 @@ def jobSwapBEA2026 : JobSwapParams where
   L_non_pos := by norm_num
   K_pos := by norm_num
   A_nn := by norm_num
+
+/-- **Agreement pin — non-substitutable share, three ways — DEFINITIONAL
+    EXPOSURE plus one arithmetic leg.** `nonSubShareBEA` (25% of payroll,
+    from the BLS occupation aggregates in this file's header) and
+    `calBEA2026.nonSubShare` are the same number, and the two-bucket
+    calibration's labor share matches the headline BEA labor share in
+    `calBEA2026.α`; both of those close by `rfl` and exist to catch a
+    one-sided edit of an anchor authored in two places. The third leg is not
+    an identity: the 118.5M / 39.5M split actually stored in
+    `jobSwapBEA2026` puts exactly a quarter of the 158M labor force in the
+    non-substitutable bucket, so the "≈ 25% of jobs are non-substitutable"
+    claim in the prose above and the `L_non` that `jobSwapBEA2026.cobbOutput`
+    computes with are the same statement, checked here instead of asserted. -/
+theorem jobSwapBEA2026_matches_calibration :
+    nonSubShareBEA = calBEA2026.nonSubShare.val ∧
+    jobSwapBEA2026.α = calBEA2026.α.val ∧
+    jobSwapBEA2026.L_non / (jobSwapBEA2026.L_sub + jobSwapBEA2026.L_non) =
+      calBEA2026.nonSubShare.val := by
+  refine ⟨rfl, rfl, ?_⟩
+  have hl : jobSwapBEA2026.L_non = (395 : ℝ) / 10 := rfl
+  have hs : jobSwapBEA2026.L_sub = (1185 : ℝ) / 10 := rfl
+  have hn : calBEA2026.nonSubShare.val = (25 : ℝ) / 100 := rfl
+  rw [hl, hs, hn]
+  field_simp
+  norm_num
 
 end
 

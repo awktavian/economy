@@ -71,16 +71,16 @@ CI runs both, plus the gate's own unit tests, on every push to `main` and every 
 ```text
 # audit-census:begin
 lean_files: 28
-theorem_count: 263
+theorem_count: 270
 lemma_count: 3
 other_decl_count: 131
 private_decls: 3
-public_kernel_decls: 263
+public_kernel_decls: 270
 sorry_in_code: 0
 native_decide_in_code: 0
 user_axioms: 0
 placeholders: 0
-theorem_citations: 17
+theorem_citations: 27
 allowed_axioms: propext, Classical.choice, Quot.sound
 # audit-census:end
 ```
@@ -171,6 +171,10 @@ Every empirical parameter is in `Economy/Calibration.lean`. The three canonical 
 - `debtStack` — hyperscaler debt (~$400B)
 
 Every field is subtype-constrained to a plausible range. Violating those bounds is a type error, not a runtime error. Change one number, recompile, see the effect.
+
+The ordering constraint `H_min_lt_H_max` used to be stored and read by nothing. Four results now put it to work and pin the calibration layer against future edits. `exposure_below_saturation` proves that at the base horizon the exposure share is exactly the ratio `H_min / H_max` and strictly between 0 and 1 — the `min`/`max` clipping does not bite there — where `exposure_consistency` already pinned it at saturation, so a calibration whose two horizons coincide would no longer typecheck its own ordering proof. `calBEA2026_exposure_at_base` evaluates that identity at the BEA calibration: one task in twelve (`1/12`) is inside the frontier at `t = 0`, not all of them. `fromCalibration_Hmin_lt_Hmax` carries the same strict ordering across `fromCalibration` into a `Scenario`, whose type only requires each horizon to be positive and so cannot state the ordering itself. And `fromCalibration_data_legs` names the six values the bridge is supposed to carry, so a refactor that reorders the fields, swaps the two horizons or quietly defaults `costSavings` turns red instead of silently changing the numbers on this page.
+
+Three more results live in the modules that import this calibration, and they check the numbers that are written down twice. `recessionBEA2026_matches_calibration`, `capexBEA2026_matches_calibration` and `jobSwapBEA2026_matches_calibration` compare the recession triple, the capex triple and the labor share against their second copy in `calBEA2026`. The duplication is deliberate — the scenario bridge reads none of those fields — but until now nothing compared the two copies, so editing one file's NBER or MUFG anchor left the corpus stating two different recessions, debt stacks and labor splits with no error anywhere. Two of these pins hold by reflexivity today and say so in their file headers: they are agreement guards against the next edit, not validations, and they are not counted as points on the falsification surface. The capex pin also states one strict inequality on purpose, because the calibration's `gK` is capex as a share of GDP while the capex module's `gK_hyper` is the growth rate its debt-sustainability switch selects on — two quantities that a parameter-unifying refactor would be tempted to merge. And the labor pin's last leg is arithmetic rather than an identity: the 118.5M / 39.5M buckets really do put a quarter of the 158M labor force in the non-substitutable bucket, so the share cited in prose and the `jobSwapBEA2026` the CES nest computes with are the same claim.
 
 ## Tier discipline
 

@@ -2,14 +2,39 @@
   Economy.Calibration
   Parametric model + validation theorems.
 
-  ECONOMIC CLAIM: the six irreducibly empirical parameters of the corpus
-  (labor share α, base horizon H_min, saturation horizon H_max, MPC m,
-  top-decile capital ownership ψ_k, and METR regression slope β_slope) are
-  collected into a single `ModelCalibration` structure with subtype-guarded
-  ranges. Three canonical calibrations are defined: `calBEA2026` (BEA / BLS
-  / AEI as-of Q1 2026, METR fast slope), `calBaseline` (same but METR
+  ECONOMIC CLAIM: the empirical parameters of the corpus are collected into
+  a single `ModelCalibration` structure with subtype-guarded ranges. The
+  structure carries fifteen numeric fields plus one ordering constraint. Six
+  of them are the irreducibly empirical core the blog cites (labor share α,
+  base horizon H_min, saturation horizon H_max, MPC m, top-decile capital
+  ownership ψ_k, and METR regression slope β_slope); the other nine carry the
+  growth, cost-savings, non-substitutable-labor, recession and capex
+  parameters. Three canonical calibrations are defined: `calBEA2026` (BEA /
+  BLS / AEI as-of Q1 2026, METR fast slope), `calBaseline` (same but METR
   baseline slope), and `calPessimistic` (highest-plausible displacement
   corner).
+
+  FIELD REACH, stated plainly: of the fifteen numeric fields, the scenario
+  bridge `Scenario.fromCalibration` reads six (`α`, `H_min`, `H_max`,
+  `β_slope` through `doublingTime`, `gK`, `costSavings`). The remaining nine
+  (`m`, `ψ_k`, `nonSubShare`, `recessionHazard`, `recessionDuration`,
+  `recessionShock`, `debtStack`, `interestRate`, `gK_maintenance`) are
+  stored and range-checked here and read by nothing downstream: the
+  failure-mode modules carry their own separately-authored parameters
+  (`recessionBEA2026` in `Economy.RecessionShock`, `capexBEA2026` in
+  `Economy.CapexBubble`, `jobSwapBEA2026` and `nonSubShareBEA` in
+  `Economy.JobSwapping`) with the same literals. The two copies are now
+  pinned against each other by `recessionBEA2026_matches_calibration`,
+  `capexBEA2026_matches_calibration` and `jobSwapBEA2026_matches_calibration`,
+  which live in those three modules — they already import this one, so the
+  pins cannot form an import cycle. They are agreement checks, not
+  validations: each equality leg reduces by `rfl` today, and what they buy is
+  that editing one copy of a shared anchor fails the build instead of leaving
+  the corpus stating two different recessions, debt stacks and labor splits.
+  The capex pin additionally records, as a strict inequality, that the
+  calibration's `gK` (capex as a share of GDP) and the module's `gK_hyper`
+  (the growth rate its sustainability switch selects on) are different
+  quantities, not one parameter that a unifying refactor could merge.
 
   VALIDATION THEOREMS V1–V6 check the model's headline predictions against
   the empirical anchors in REFERENCES.md. Each validation is a theorem
@@ -25,15 +50,27 @@
   SENSITIVITY: five signed partial-monotonicity theorems on the model
   output. The sign of each response is PROVED, not asserted.
 
-  CONSISTENCY: three cross-module checks that the separately-defined
-  quantities agree on the shared boundary.
+  CONSISTENCY: four cross-module checks that the separately-defined
+  quantities agree on the shared boundary. C1 pins exposure AT saturation and
+  C4 pins it BELOW saturation, which is what makes the ordering constraint
+  `H_min_lt_H_max` do work instead of sitting inert; C4b evaluates that
+  identity at `calBEA2026`, where the base-horizon exposure is `1/12`.
+
+  BRIDGE: `Scenario.fromCalibration` wires a calibration into the forward-time
+  scenario. Two theorems say what the bridge carries (B1, field-by-field,
+  definitional exposure) and what it preserves that the `Scenario` type does
+  not require (B2, the strict base-below-saturation horizon ordering).
 
   SOURCES: see REFERENCES.md for every number appearing below.
 
   TIER: THEOREM for most results. Exceptions, labeled at their docstrings:
   V3 is a NUMERICAL OBSERVATION (free-parameter witness, not independently
-  measured rates) and V5 is a NUMERICAL OBSERVATION (definitional pin that
-  cannot fail by construction). No sorry, no axiom, no placeholder.
+  measured rates), V5 is a NUMERICAL OBSERVATION (definitional pin that
+  cannot fail by construction), B1 is a DEFINITIONAL EXPOSURE (bridge
+  integrity pin: true by iota reduction today, and there to turn red if the
+  bridge is ever refactored, so it is not a falsification-surface point) and
+  C4b is a NUMERICAL OBSERVATION (arithmetic on this file's own calibration
+  inputs, not a measured anchor). No sorry, no axiom, no placeholder.
 -/
 import Economy.Bounds
 import Economy.Forecast
@@ -54,8 +91,10 @@ noncomputable section
 
 /-! ### Part 1 — The parametric model -/
 
-/-- The six irreducibly empirical parameters of the corpus, each wrapped
-    in a subtype that carries its sign/range constraint. -/
+/-- The empirical parameters of the corpus: fifteen numeric fields plus the
+    `H_min_lt_H_max` ordering constraint, each numeric field wrapped in a
+    subtype that carries its sign/range constraint. See the file header for
+    which of these the scenario bridge actually reads. -/
 structure ModelCalibration where
   /-- Labor share in Cobb-Douglas (BEA ≈ 0.60). -/
   α         : {x : ℝ // 0 < x ∧ x < 1}
@@ -446,6 +485,42 @@ theorem exposure_consistency (c : ModelCalibration) :
   rw [div_self hne]
   simp
 
+/-- **C4. Sub-saturation consistency**: at the BASE horizon `H_min` the
+    exposure share is strictly inside `(0, 1)` and the `min`/`max` clipping in
+    `exposureFromHorizon` is inactive, so the value is exactly the ratio
+    `H_min / H_max`. This is the dual of C1, which pins exposure AT
+    saturation: together they say the calibrated horizon interval straddles
+    the exposure band rather than collapsing onto its edge. The strict bounds
+    are what `H_min_lt_H_max` buys — without the ordering constraint the
+    statement is false (at `H_min = H_max` the ratio is 1, and above it the
+    upper clip bites) — so this is the ordering field's consumer, and a
+    refactor that relaxes the subtype or swaps the two horizons reddens it. -/
+theorem exposure_below_saturation (c : ModelCalibration) :
+    exposureFromHorizon c.H_min.val c.H_max.val = c.H_min.val / c.H_max.val ∧
+    0 < c.H_min.val / c.H_max.val ∧ c.H_min.val / c.H_max.val < 1 := by
+  have hmin : 0 < c.H_min.val := c.H_min.property
+  have hmax : 0 < c.H_max.val := c.H_max.property
+  have hratio : 0 < c.H_min.val / c.H_max.val := div_pos hmin hmax
+  have hlt : c.H_min.val / c.H_max.val < 1 := by
+    rw [div_lt_one hmax]; exact c.H_min_lt_H_max
+  refine ⟨?_, hratio, hlt⟩
+  unfold exposureFromHorizon
+  rw [max_eq_right hratio.le, min_eq_right hlt.le]
+
+/-- **C4b. Base-horizon exposure under the BEA calibration — NUMERICAL
+    OBSERVATION.** Evaluating the identity half of C4 at `calBEA2026`
+    (`H_min = 1` month, `H_max = 12` months) gives `1/12`: the automation
+    frontier at `t = 0` covers one task in twelve, not saturation. The
+    clipping is what makes this worth checking — `min 1 (max 0 (1/12))` does
+    NOT reduce to `1/12` by computation, because `≤` on ℝ is decided
+    classically here, so the value needs C4's ordering argument and not just
+    numeral arithmetic. The number is arithmetic on this file's own
+    calibration inputs, not an independent measurement, and it is stated as a
+    declaration so the published slice has a kernel receipt. -/
+theorem calBEA2026_exposure_at_base :
+    exposureFromHorizon calBEA2026.H_min.val calBEA2026.H_max.val = 1 / 12 :=
+  (exposure_below_saturation calBEA2026).1.trans rfl
+
 /-- **C2. Labor-share consistency**: under full automation (every task
     automated, ψᵢ = 1), the `LaborShare.laborShare` function agrees with
     the `FactorIncome` labor share at the corner case `w = 0`, both giving
@@ -485,6 +560,42 @@ noncomputable def Scenario.fromCalibration (c : ModelCalibration) : Scenario whe
   α_lt_one := c.α.property.2
   gK_nn := c.gK.property
   cost_nn := le_of_lt c.costSavings.property.1
+
+/-- **B1. Bridge integrity — DEFINITIONAL EXPOSURE.** The six data legs of
+    `Scenario.fromCalibration` are the calibration's own values, carried
+    unchanged: the doubling time derived from `β_slope`, both horizons, the
+    labor share, the capital-growth rate and the cost-savings coefficient.
+    Each projection reduces by `rfl` against the bridge as it is written
+    today, so this cannot fail now and is NOT a point on the V1–V6
+    falsification surface. It is here for the other reason: it is the check
+    that turns red if the bridge is refactored — a field reordered, `H₀` and
+    `Hmax` swapped, `costSavings` defaulted onto the scenario floor, the
+    doubling time replaced by a raw slope. Labeled definitional exposure, not
+    validation, for exactly that reason (the V5 docstring states the same
+    discipline). -/
+theorem fromCalibration_data_legs (c : ModelCalibration) :
+    (Scenario.fromCalibration c).T = c.doublingTime ∧
+    (Scenario.fromCalibration c).H₀ = c.H_min.val ∧
+    (Scenario.fromCalibration c).Hmax = c.H_max.val ∧
+    (Scenario.fromCalibration c).α = c.α.val ∧
+    (Scenario.fromCalibration c).gK = c.gK.val ∧
+    (Scenario.fromCalibration c).costSavings = c.costSavings.val :=
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+/-- **B2. The horizon ordering survives the bridge (THEOREM).**
+    `ModelCalibration` requires `H_min < H_max`; `Scenario` does not — its
+    constraints are per-field positivity (`H₀_pos`, `Hmax_pos`) and nothing
+    relates the two horizons. So the strict base-below-saturation ordering is
+    a property the calibration layer has and the scenario type cannot state,
+    and it is exactly the property a hand-written scenario can silently lose.
+    This transports it: every scenario built from a calibration has its base
+    horizon strictly below its saturation horizon. Unlike B1 this is not a
+    reduction — it moves a constraint across a structure boundary, and it is
+    the consumer of `H_min_lt_H_max` on the scenario side, complementing C4
+    on the exposure side. -/
+theorem fromCalibration_Hmin_lt_Hmax (c : ModelCalibration) :
+    (Scenario.fromCalibration c).H₀ < (Scenario.fromCalibration c).Hmax :=
+  c.H_min_lt_H_max
 
 end
 

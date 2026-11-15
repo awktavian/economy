@@ -25,7 +25,13 @@
     estimated $400B aggregate hyperscaler debt against $1.7T market cap.
   * BEA NIPA: maintenance capex ≈ 1.5% annual depreciation rate.
 
-  TIER: THEOREM for all results below.
+  TIER: THEOREM for the inequalities and the sustainability switch; NUMERICAL
+  OBSERVATION for the BEA-anchored evaluations of those results at
+  `capexBEA2026`; DEFINITIONAL EXPOSURE for
+  `capexBEA2026_matches_calibration` (agreement pin against
+  `Economy.Calibration` — equalities between independently authored literal
+  constants, plus one strict inequality that records that `gK` and `gK_hyper`
+  are deliberately different quantities).
 -/
 import Economy.FinanceRealCoupling
 import Economy.Calibration
@@ -188,9 +194,13 @@ theorem effectiveGK_yields_netOutputGrowth_bound
 
 /-! ### Theorem 5 — BEA 2026 calibration -/
 
-/-- BEA / MUFG / CreditSights 2026 calibration: $400B debt at 5%/yr
-    (≈ 0.00417/mo), cash flow growth ≈ 0.005/mo (sustainable today),
-    hyperscaler gK ≈ 0.005/mo, maintenance gK ≈ 0.00125/mo. -/
+/-- BEA / MUFG / CreditSights 2026 calibration: $400B debt at 0.5%/mo
+    (≈ 6%/yr, matching this file's header), cash flow growth ≈ 0.005/mo
+    (sustainable today), hyperscaler gK ≈ 0.005/mo, maintenance gK ≈
+    0.00125/mo. The prose used to read "5%/yr (≈ 0.00417/mo)" while the
+    `interestRate` field it describes is `5 / 1000` PER month; the inline
+    comment on that field was right and this docstring was not, and the
+    per-month rate is what `sustainable` and `criticalRate` consume. -/
 def capexBEA2026 : CapexParams where
   cashFlowGrowth := 5 / 1000
   debtStack := 4 / 10        -- $0.4T
@@ -219,6 +229,33 @@ theorem capexBEA_today_sustainable :
 theorem capexBEA_pop_loss_monthly :
     popGhostGDPLoss capexBEA2026 (6 / 10) = 15 / 10000 := by
   unfold popGhostGDPLoss capexBEA2026
+  norm_num
+
+/-- **Agreement pin — capex triple, plus one difference kept on purpose —
+    DEFINITIONAL EXPOSURE.** The debt stack ($0.4T), the interest rate
+    (0.005/mo) and the maintenance capital growth (0.00125/mo) stored here
+    are the same numbers `Economy.Calibration` stores in `calBEA2026`
+    (`debtStack`, `interestRate`, `gK_maintenance`); the first three legs
+    close by `rfl`, so a future edit to one copy of the MUFG/CreditSights
+    anchor fails here instead of leaving the two modules describing two
+    different hyperscaler balance sheets. The fourth leg is NOT an equality
+    and is deliberately stated as an inequality: the calibration's `gK` is
+    the capex run-rate as a share of GDP (0.003/mo) while this module's
+    `gK_hyper` is the hyperscaler-regime capital-growth rate the
+    sustainability switch selects on (0.005/mo). They are different
+    quantities that a parameter-unifying refactor would be tempted to merge;
+    `bubble_pop_ghost_gdp_loss` and `effectiveGK_hyper_below_critical` both
+    depend on keeping them apart, so the strict inequality is recorded rather
+    than assumed. -/
+theorem capexBEA2026_matches_calibration :
+    capexBEA2026.debtStack = calBEA2026.debtStack.val ∧
+    capexBEA2026.interestRate = calBEA2026.interestRate.val ∧
+    capexBEA2026.gK_maintenance = calBEA2026.gK_maintenance.val ∧
+    calBEA2026.gK.val < capexBEA2026.gK_hyper := by
+  refine ⟨rfl, rfl, rfl, ?_⟩
+  have hg : calBEA2026.gK.val = (3 : ℝ) / 1000 := rfl
+  have hh : capexBEA2026.gK_hyper = (5 : ℝ) / 1000 := rfl
+  rw [hg, hh]
   norm_num
 
 /-! ### Theorem 6 — debt-service capacity threshold -/
