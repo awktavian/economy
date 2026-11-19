@@ -55,6 +55,23 @@
     * B — the `Scenario` type admits the two horizons swapped, which is the
       constraint B2 exists to transport, and the fast bridge is not the
       baseline scenario.
+    * ψ — the pessimistic corner's ownership field is NOT the BEA anchor
+      (0.85 against 0.77), so the agreement leg names a number instead of an
+      equality any calibration would satisfy.
+
+  AGREEMENT LEG. `psi_k_matches_calibration` couples the Piketty-Zucman 0.77
+  top-decile capital-ownership anchor across two files. The anchor is authored
+  twice: as the subtype-guarded `psi_k` field of `calBEA2026` and
+  `calBaseline`, and as the plain `psi_k` field of `Inequality.twoClassBEA`.
+  Neither copy derives from the other -- `Inequality` imports only Mathlib, so
+  it cannot read this calibration, and the scenario bridge reads no ownership
+  field -- so until this leg an edit to one copy left the corpus stating two
+  different top-decile ownership shares with no error anywhere. That makes
+  `calBEA2026.ψ_k` and `calBaseline.ψ_k` -- the last two of the six
+  irreducibly empirical core fields that no file outside `Calibration` read --
+  consumed. It is the fourth instance of the discipline
+  `recessionBEA2026_matches_calibration`, `capexBEA2026_matches_calibration`
+  and `jobSwapBEA2026_matches_calibration` already carry.
 
   TIER: PIN. Nothing here is a falsification-surface point in its own right:
   the falsifiable claims live in `Calibration.lean`, and this file's value is
@@ -663,6 +680,44 @@ theorem neg_b3_fast_bridge_is_not_baseline_scenario :
     ((fromCalibration_data_legs calBEA2026).1.trans
       (congrArg Scenario.T h)).trans rfl
   linarith [pin_doubling_times_at_calibrations.1]
+
+/-! ### Part 6 — The ownership anchor, authored twice -/
+
+/-- **P-ψ agreement.** The top-decile capital-ownership anchor 0.77
+    (Piketty–Zucman distributional accounts, `REFERENCES.md`) is written down
+    twice: as the subtype-guarded `ψ_k` field of `calBEA2026` and of
+    `calBaseline`, and as the plain `ψ_k` field of `Inequality.twoClassBEA` —
+    the carrier `twoClassBEA_topDecileShare` evaluates the two-class
+    decomposition at, and the left-hand carrier of `pin_s4_at_carriers`.
+    Neither copy is derived from the other: `Inequality` imports only Mathlib
+    and so cannot read this calibration, and the scenario bridge carries no
+    ownership field. Both legs close by `rfl`, which is the point — the day
+    someone updates the anchor in one file and not the other, this turns red
+    instead of the corpus publishing two different top-decile ownership
+    shares, one to the sensitivity leg and one to the distributional accounts
+    row it cites. An agreement check, not a validation theorem, in the same
+    discipline as `recessionBEA2026_matches_calibration`,
+    `capexBEA2026_matches_calibration` and
+    `jobSwapBEA2026_matches_calibration`; it is not a point on the
+    falsification surface. What it buys besides the guard: `calBEA2026.ψ_k`
+    and `calBaseline.ψ_k` were read by nothing outside the file that declares
+    them — the last two of the six irreducibly empirical core fields to sit
+    that way — and are consumed now. -/
+theorem psi_k_matches_calibration :
+    twoClassBEA.ψ_k = calBEA2026.ψ_k.val ∧
+      twoClassBEA.ψ_k = calBaseline.ψ_k.val :=
+  ⟨rfl, rfl⟩
+
+/-- **Negative control, ownership anchor.** The pessimistic corner is NOT the
+    BEA anchor: `calPessimistic.ψ_k` is 0.85 against the anchor's 0.77, so the
+    agreement leg above names a specific number rather than an equality every
+    one of the three canonical calibrations would satisfy. A guard that could
+    not tell the BEA calibration from the displacement corner would guard
+    nothing. -/
+theorem neg_psi_k_corner_is_not_bea_anchor :
+    ¬ (twoClassBEA.ψ_k = calPessimistic.ψ_k.val) := by
+  show ¬ ((77 : ℝ) / 100 = 85 / 100)
+  norm_num
 
 end
 

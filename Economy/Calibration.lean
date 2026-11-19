@@ -27,7 +27,15 @@
   pinned against each other by `recessionBEA2026_matches_calibration`,
   `capexBEA2026_matches_calibration` and `jobSwapBEA2026_matches_calibration`,
   which live in those three modules — they already import this one, so the
-  pins cannot form an import cycle. They are agreement checks, not
+  pins cannot form an import cycle. Two of the nine are read in the pin
+  module rather than by a failure-mode module: `pin_s5_mpc_response_at_calibrations`
+  applies S5 at `calBEA2026.m` and `calPessimistic.m`, and
+  `psi_k_matches_calibration` compares `calBEA2026.ψ_k` and `calBaseline.ψ_k`
+  with the separately authored `twoClassBEA` copy in `Economy.Inequality` — that pin cannot
+  live in `Inequality`, which imports only Mathlib and so cannot read this
+  calibration, and `neg_psi_k_corner_is_not_bea_anchor` records that the guard
+  is not vacuous (`calPessimistic.ψ_k` is 0.85 against the anchor's 0.77).
+  Those legs are why the two fields are no longer read by nothing.
   validations: each equality leg reduces by `rfl` today, and what they buy is
   that editing one copy of a shared anchor fails the build instead of leaving
   the corpus stating two different recessions, debt stacks and labor splits.
