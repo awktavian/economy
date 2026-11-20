@@ -381,6 +381,82 @@ class StaleClaims(Fixture):
             shutil.rmtree(empty, ignore_errors=True)
 
 
+class ForecastTableParity(Fixture):
+    """`forecasts/forecast_table.md` cites receipts by file:line, and a line
+    number moves with every edit above the declaration it names. Measured at
+    d5fdebc all thirteen numbered citations pointed at prose or unrelated
+    tactic lines while the gate stayed green, because nothing read that file.
+    This class pins the leg `forecast_violations` added there."""
+
+    def table(self, text):
+        write(os.path.join(self.root, "forecasts", "forecast_table.md"), text)
+        return A.forecast_violations(self.root, self.census())
+
+    def test_absent_table_is_not_a_violation(self):
+        # the fixture has no forecasts dir: an un-published carrier certifies nothing
+        self.assertEqual(A.forecast_violations(self.root, self.census()), [])
+
+    def test_exact_line_citation_passes(self):
+        # Foo.lean:5 is headline_result, Bar.lean:3 is second_result (measured
+        # from the census in the same way the gate measures them)
+        v = self.table(
+            "# forecasts\n\n"
+            "Headline: `headline_result` (`Economy/Foo.lean:5`)\n\n"
+            "- `second_result` — `Economy/Bar.lean:3`\n")
+        self.assertEqual(v, [])
+
+    def test_dotted_full_name_citation_passes(self):
+        v = self.table("`Economy.Sub.headline_result` (`Economy/Foo.lean:5`)\n")
+        self.assertEqual(v, [])
+
+    def test_wrapped_citation_resolves_against_the_sentence_above(self):
+        v = self.table(
+            "claim in this table is dominance: `second_result`\n"
+            "(`Economy/Bar.lean:3`). done\n")
+        self.assertEqual(v, [])
+
+    def test_stale_line_is_reported_with_the_true_line(self):
+        v = self.table("- `headline_result` — `Economy/Foo.lean:99`\n")
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("`headline_result` at Economy/Foo.lean:99", v[0])
+        self.assertIn("measures it at Economy/Foo.lean:5", v[0])
+
+    def test_citation_landing_on_another_declaration_is_reported(self):
+        # Foo.lean:7 declares helper_thing, not the cited headline_result
+        v = self.table("- `headline_result` — `Economy/Foo.lean:7`\n")
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("measures it at Economy/Foo.lean:5", v[0])
+
+    def test_wrong_file_for_a_live_name_reports_its_home(self):
+        v = self.table("- `headline_result` — `Economy/Bar.lean:3`\n")
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("measures it at Economy/Foo.lean:5", v[0])
+
+    def test_dead_name_is_reported_as_not_a_live_declaration(self):
+        v = self.table("- `no_such_result` — `Economy/Foo.lean:5`\n")
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("is a live declaration", v[0])
+
+    def test_unknown_file_is_reported(self):
+        v = self.table("- `headline_result` — `Economy/Gone.lean:5`\n")
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("no Lean declarations", v[0])
+
+    def test_bare_line_citation_with_no_name_is_reported(self):
+        v = self.table("look here:\n\n(`Economy/Foo.lean:5`)\n")
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("no named declaration", v[0])
+
+    def test_context_does_not_leak_across_bullets(self):
+        # line 3 of Bar.lean declares second_result; citing headline_result
+        # there must fail even though a valid citation sits on the line above
+        v = self.table(
+            "- `second_result` — `Economy/Bar.lean:3`\n"
+            "- `headline_result` — `Economy/Bar.lean:3`\n")
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("`headline_result`", v[0])
+
+
 class CiInvariants(Fixture):
 
     def ci(self, text):

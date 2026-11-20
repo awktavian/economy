@@ -22,8 +22,8 @@ exposure column uses `min 1 (max 0 (H / Hmax)) = min 1 (I / 12)`.
 | 36 | **512** | 512 mo | 1.000 (saturated) | 6.300 | 0.0432 | saturated, above baseline |
 
 Witness for rows 4–12: `pipeline_metr_horizon_36mo` proves `intelligenceLevel 36 4 = 512`
-(`Economy/EndToEndForecast.lean:19`); the intermediate doublings 2, 4, 8, 64 come from
-`intelligenceLevel_k_doublings` (`Economy/IntelligenceTrajectory.lean:73`).
+(`Economy/EndToEndForecast.lean:20`); the intermediate doublings 2, 4, 8, 64 come from
+`intelligenceLevel_k_doublings` (`Economy/IntelligenceTrajectory.lean:74`).
 
 ## calBaseline — slow slope, T = 7 months
 
@@ -40,7 +40,7 @@ Witness for rows 4–12: `pipeline_metr_horizon_36mo` proves `intelligenceLevel 
 
 Non-integer rows are quoted as decimal approximations; the *only* kernel-exact
 claim in this table is qualitative dominance: `pipeline_fast_dominates_baseline`
-(`Economy/EndToEndForecast.lean:45`). The decimal values are illustrative, not proved.
+(`Economy/EndToEndForecast.lean:56`). The decimal values are illustrative, not proved.
 
 ## calPessimistic — fast slope, T = 4, costSavings = 0.250
 
@@ -55,18 +55,18 @@ claim in this table is qualitative dominance: `pipeline_fast_dominates_baseline`
 Note: `calPessimistic` uses `α = 0.55` (lower labor share), `ψ_k = 0.85` (higher
 top-decile capital concentration), `m = 0.95`. The headline is NOT "more GDP" —
 it is "more displacement + more concentration." Welfare divergence
-(`welfare_can_fall_with_gdp_rise`, `Economy/Welfare.lean:73`) is strongest in
+(`welfare_can_fall_with_gdp_rise`, `Economy/Welfare.lean:78`) is strongest in
 this calibration.
 
 ## Receipts
 
-- `pipeline_metr_horizon_36mo` — `Economy/EndToEndForecast.lean:19`
-- `pipeline_acemoglu_envelope_consistent` — `Economy/EndToEndForecast.lean:37`
-- `pipeline_fast_dominates_baseline` — `Economy/EndToEndForecast.lean:45`
-- `pipeline_welfare_sign_under_collapse` — `Economy/EndToEndForecast.lean:70`
-- `pipeline_displacement_meets_brynjolfsson` — `Economy/EndToEndForecast.lean:80`
-- `ModelCalibration` (extended with `gK`, `costSavings`) — `Economy/Calibration.lean:56`
+- `pipeline_metr_horizon_36mo` — `Economy/EndToEndForecast.lean:20`
+- `pipeline_acemoglu_envelope_consistent` — `Economy/EndToEndForecast.lean:46`
+- `pipeline_fast_dominates_baseline` — `Economy/EndToEndForecast.lean:56`
+- `pipeline_welfare_sign_under_collapse` — `Economy/EndToEndForecast.lean:82`
+- `pipeline_displacement_meets_brynjolfsson` — `Economy/EndToEndForecast.lean:95`
+- `ModelCalibration` (extended with `gK`, `costSavings`) — `Economy/Calibration.lean:115`
 - `Scenario.fromCalibration` — `Economy/Calibration.lean` (Part 6, bridge section)
-- `validation_metr_24mo` — `Economy/Calibration.lean:195`
-- `ghost_gdp_constant_labor` — `Economy/Macro.lean:163`
-- `welfare_can_fall_with_gdp_rise` — `Economy/Welfare.lean:73`
+- `validation_metr_24mo` — `Economy/Calibration.lean:312`
+- `ghost_gdp_constant_labor` — `Economy/Macro.lean:276`
+- `welfare_can_fall_with_gdp_rise` — `Economy/Welfare.lean:78`

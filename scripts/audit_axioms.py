@@ -22,6 +22,12 @@ default / ``--check``
     * README parity: the machine census block must equal what the corpus
       actually contains, and every theorem cited in the Receipts table must
       still resolve to a live declaration;
+    * forecast-table parity: every ``Economy/<File>.lean:<N>`` citation in
+      ``forecasts/forecast_table.md`` must name, in its own context, a
+      declaration the census measures at exactly that line — the one
+      citation form that moves with every edit above the cited
+      declaration, and nothing was watching it (see
+      ``forecast_violations``);
     * ``.github/workflows/ci.yml`` invariants, including symlink-safe cache
       seeding (a symlinked ``.lake/packages/<pkg>`` prefix lets an unguarded
       ``lake exe cache get`` write through into the machine-wide cache).
@@ -696,6 +702,110 @@ def readme_violations(root, c, readme_text=None):
     return v
 
 
+# --------------------------------------------------------------------------
+# Forecast-table parity
+# --------------------------------------------------------------------------
+#
+# `forecasts/forecast_table.md` is a published carrier: its receipts cite
+# declarations by file AND line. Name-only citations (what the README uses)
+# drift only when a declaration is renamed; line citations drift when ANY
+# line is inserted above the target, which is every ordinary edit. Measured
+# at d5fdebc: all thirteen numbered citations in the table pointed at prose
+# or unrelated tactic lines, and no gate noticed, because nothing checked
+# this file. The parity below decides each citation against the compiler-
+# adjacent census (declaration file + line), never against a text guess.
+
+FORECAST_REL = os.path.join("forecasts", "forecast_table.md")
+_FORECAST_CITE_RE = re.compile(r"`(Economy/[A-Za-z0-9_]+\.lean):([0-9]+)`")
+_MD_TOKEN_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_.]*)`")
+_MD_PARAGRAPH_STOP_RE = re.compile(r"^\s*$|^#|^\s*\|")
+
+
+def forecast_citation_contexts(md_text):
+    """Every numbered citation in the table, with the names around it.
+
+    Returns [(md_line, rel_file, cited_line, [tokens, ...]), ...]. Tokens
+    are identifier-shaped backticked names: those on the citation's own
+    line before the citation come first — the Receipts bullets cite their
+    leftmost name (`ModelCalibration` before the `gK`/`costSavings` field
+    mentions) — and when a wrapped citation carries none on its own line,
+    the walk goes up to the nearest line with any tokens, stopping at a
+    blank line, heading, table row, or another citation so context cannot
+    leak between receipts.
+    """
+    lines = md_text.splitlines()
+    out = []
+    for i, line in enumerate(lines):
+        for m in _FORECAST_CITE_RE.finditer(line):
+            toks = [t for t in _MD_TOKEN_RE.findall(line[:m.start()])
+                    if "/" not in t and not t.endswith(".lean")]
+            j = i - 1
+            while not toks and j >= 0 and not _MD_PARAGRAPH_STOP_RE.search(lines[j]) \
+                    and not _FORECAST_CITE_RE.search(lines[j]):
+                toks = [t for t in _MD_TOKEN_RE.findall(lines[j])
+                        if "/" not in t and not t.endswith(".lean")]
+                j -= 1
+            out.append((i + 1, m.group(1), int(m.group(2)), toks))
+    return out
+
+
+def forecast_violations(root, c, md_text=None):
+    """Do the published forecast table's file:line receipts still point true?
+
+    A citation passes when the census measures one of its context names as
+    a declaration on the cited line of the cited file. Every failure says
+    where the named declaration actually lives, because that is the repair
+    the next editor needs. An absent table is not a violation: the gate
+    pins citations the repository publishes, and certifies nothing about
+    a carrier it has removed.
+    """
+    path = os.path.join(root, FORECAST_REL)
+    if md_text is None:
+        if not os.path.isfile(path):
+            return []
+        with open(path, "r", encoding="utf-8") as fh:
+            md_text = fh.read()
+    live = {}   # (file, line) -> names declared there
+    where = {}  # name -> [(file, line), ...]
+    for d in c["decls"]:
+        here = live.setdefault((d.file, d.line), set())
+        if d.name:
+            here.add(d.name)
+            where.setdefault(d.name, []).append((d.file, d.line))
+        if d.full:
+            here.add(d.full)
+            where.setdefault(d.full, []).append((d.file, d.line))
+    files = {d.file for d in c["decls"]}
+    v = []
+    for md_line, rel, cited, toks in forecast_citation_contexts(md_text):
+        if rel not in files:
+            v.append("%s:%d cites %s, which holds no Lean declarations"
+                     % (FORECAST_REL, md_line, rel))
+            continue
+        if any(t in live.get((rel, cited), ()) for t in toks):
+            continue
+        if not toks:
+            v.append("%s:%d cites %s:%d with no named declaration in its context"
+                     % (FORECAST_REL, md_line, rel, cited))
+            continue
+        home = None
+        for t in toks:
+            homes = where.get(t)
+            if not homes:
+                continue
+            same_file = [h for h in homes if h[0] == rel]
+            home = (t, same_file[0] if same_file else homes[0])
+            break
+        if home is None:
+            v.append("%s:%d cites %s:%d for `%s`, none of which is a live declaration"
+                     % (FORECAST_REL, md_line, rel, cited, "` or `".join(toks)))
+            continue
+        name, (hfile, hline) = home
+        v.append("%s:%d cites `%s` at %s:%d, but the corpus measures it at %s:%d"
+                 % (FORECAST_REL, md_line, name, rel, cited, hfile, hline))
+    return v
+
+
 CI_CHECK_TOKENS = (
     ("audit_axioms.py", "the axiom gate never runs in CI"),
     ("--check", "CI does not run the static gate"),
@@ -1210,6 +1320,7 @@ def evaluate(root, verify_kernel=False, skip_readme=False, skip_ci=False,
     report["violations"].extend(static_violations(root, c))
     if not skip_readme:
         report["violations"].extend(readme_violations(root, c))
+        report["violations"].extend(forecast_violations(root, c))
     if not skip_ci:
         report["violations"].extend(ci_violations(root))
     if verify_kernel:
@@ -1371,8 +1482,8 @@ def main(argv=None):
             print("CLEAN: 0 sorry, 0 native_decide, 0 user axioms; kernel verified every "
                   "public theorem under [%s]" % ", ".join(ALLOWED_AXIOMS))
         else:
-            print("CLEAN: 0 sorry, 0 native_decide, 0 user axioms; README census and CI "
-                  "wiring pinned")
+            print("CLEAN: 0 sorry, 0 native_decide, 0 user axioms; README census, "
+                  "forecast-table citations and CI wiring pinned")
     elif rc == EX_TEMPFAIL:
         lost = report.get("kernel_lost") or []
         print("INCOMPLETE (exit %d): the static gate is clean but the kernel was never "
