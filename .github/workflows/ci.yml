@@ -38,24 +38,56 @@ jobs:
         # The estate keeps ONE census, in awkronos/reality
         # (scripts/native_decide_census.py); it is read from the runner's reality
         # object store, never copied into this repository. rc 1 = the count rose.
-        # rc 2 = UNMEASURED (control did not fire, unreadable file or baseline) and
-        # fails. A runner with no reality checkout cannot measure: that is reported
-        # as a warning naming the absence, never as a pass on a count of zero.
+        # rc 2 = UNMEASURED (dead control, unreadable baseline or unreadable source).
+        #
+        # FAIL CLOSED (QW-CENSUS-FAILCLOSED-1122, 2026-11-22). This leg used to print
+        # `::warning::native-trust census UNMEASURED` and fall out of the `else` with
+        # rc 0 whenever the runner had no reality checkout, and a scan over a tree
+        # with no tracked `.lean` file printed `RATCHET PASS: undisclosed 0 ==
+        # baseline 0` on rc 0 -- measured offline at this cut, the census returns 0
+        # rows happily, so the row count is checked here. Both are a pass measured
+        # from nothing, against the estate law that an UNMEASURED or zero-row surface
+        # is typed ABSENT and never clean (guard-fail-closed-typed-absent-row). Three
+        # absence shapes are now `::error::` + exit 2 -- no usable instrument, a
+        # census whose own self-test fails, absent rows -- and the census's verdict
+        # rc is propagated, so 1 still means the undisclosed count rose. No healthy
+        # run reddens: this job reaches the instrument and prints `RATCHET PASS:
+        # undisclosed 0 == baseline 0` (measured, run 44992534963, 2026-11-22T06:31Z,
+        # 29 tracked files on Tims-Mac-Studio-economy).
         timeout-minutes: 10
         shell: bash
         run: |
           set -euo pipefail
           R="${REALITY_CHECKOUT:-$HOME/reality}"
           CENSUS="${RUNNER_TEMP:-/tmp}/native_decide_census.py"
+          LOG="${RUNNER_TEMP:-/tmp}/native-trust-census.log"
           git -C "$R" fetch -q origin main 2>/dev/null || true
           if git -C "$R" show origin/main:scripts/native_decide_census.py > "$CENSUS" 2>/dev/null \
               && grep -q -- '--ratchet' "$CENSUS"; then
-            python3 "$CENSUS" --self-test
-            python3 "$CENSUS" --root "$GITHUB_WORKSPACE" --ratchet "$GITHUB_WORKSPACE/.github/native-decide-baseline.json" --summary | tail -n 3
-            exit "${PIPESTATUS[0]}"
+            :
           else
-            echo "::warning::native-trust census UNMEASURED on this runner: no reality checkout at $R carrying scripts/native_decide_census.py with --ratchet; the ratchet did not run here"
+            echo "::error::native-trust census UNMEASURED: no reality checkout at $R carrying scripts/native_decide_census.py with --ratchet, so the ratchet did not run on this runner -- an unmeasured census is typed ABSENT and fails, never a pass"
+            exit 2
           fi
+          selftest_rc=0
+          python3 "$CENSUS" --self-test || selftest_rc=$?
+          if [ "$selftest_rc" -ne 0 ]; then
+            echo "::error::native-trust census UNMEASURED: the instrument's own self-test failed with rc $selftest_rc, so no count this runner reads can be trusted"
+            exit 2
+          fi
+          census_rc=0
+          python3 "$CENSUS" --root "$GITHUB_WORKSPACE" --ratchet "$GITHUB_WORKSPACE/.github/native-decide-baseline.json" --summary > "$LOG" 2>&1 || census_rc=$?
+          tail -n 3 "$LOG"
+          if [ "$census_rc" -ne 0 ]; then
+            echo "::error::native-trust census rc $census_rc -- 1 = the undisclosed count rose over the baseline, 2 = UNMEASURED (dead control, unreadable baseline or unreadable source)"
+            exit "$census_rc"
+          fi
+          scanned="$(awk '/^scanned [0-9]+ tracked / {print $2; exit}' "$LOG")"
+          if [ -z "$scanned" ] || [ "$scanned" -eq 0 ]; then
+            echo "::error::native-trust census UNMEASURED: absent rows -- the scan read no tracked .lean file under $GITHUB_WORKSPACE, so its undisclosed count of zero measures nothing (check the checkout path and --root)"
+            exit 2
+          fi
+          echo "native-trust census MEASURED: $scanned tracked .lean files, undisclosed count at or under baseline"
 
       # The corpus build moved to the `soundness` job, where it runs behind a
       # symlink preflight and a build-slot lease on the toolchain this runner
