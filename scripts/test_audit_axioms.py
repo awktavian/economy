@@ -257,6 +257,58 @@ jobs:
 """
 
 
+#: The prose-doc contract needs its authorities on disk: a guide that
+#: authorises commands is only honest next to the `Makefile` and `lakefile.toml`
+#: those commands name, and the miniature repo has to carry both or the fixture
+#: measures nothing.
+LAKEFILE = """name = "fixture"
+version = "0.1.0"
+defaultTargets = ["Economy"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+version = "git#v4.35.0-rc4"
+
+[[lean_lib]]
+name = "Economy"
+"""
+
+MAKEFILE = """.PHONY: proof census
+
+proof:
+\t@python3 scripts/audit_axioms.py --check
+
+census:
+\t@python3 scripts/audit_axioms.py --write-census
+"""
+
+GUIDE = """# CLAUDE.md — fixture guide
+
+The invariant: zero `sorry`, zero user-defined axioms, every theorem
+kernel-clean under `[propext, Classical.choice, Quot.sound]`.
+
+## Toolchain
+
+- `lake build Economy` for a full build.
+- `make proof` runs the gate; `make census` refreshes the README block.
+
+## The hard rules
+
+1. **No `axiom` keyword.**
+2. **No TN placeholders.**
+3. **No inflation.**
+
+## The spine
+
+| Module | Role |
+|---|---|
+| `Foo` | headline results |
+
+- `Bar` — second results.
+"""
+
+
 class Fixture(unittest.TestCase):
     """A miniature repo the gates can be pointed at."""
 
@@ -275,6 +327,9 @@ class Fixture(unittest.TestCase):
         )
         write(os.path.join(self.root, "README.md"), self.readme)
         write(os.path.join(self.root, ".github", "workflows", "ci.yml"), good_ci())
+        write(os.path.join(self.root, "lakefile.toml"), LAKEFILE)
+        write(os.path.join(self.root, "Makefile"), MAKEFILE)
+        write(os.path.join(self.root, "CLAUDE.md"), GUIDE)
 
     def tearDown(self):
         import shutil
@@ -608,6 +663,141 @@ class CiInvariants(Fixture):
     def test_kernel_step_without_exit_75_is_refused(self):
         text = good_ci().replace('if [ "$rc" -eq 75 ]; then echo "kernel incomplete"; fi\n', "")
         self.assertTrue(any("exit 75" in v for v in self.ci(text)), self.ci(text))
+
+
+# --------------------------------------------------------------------------
+# Prose-doc contract
+# --------------------------------------------------------------------------
+
+
+class GuideContract(Fixture):
+    """CLAUDE.md is an assistant's operating manual, and it is read RAW.
+
+    Measured at aeeca347 (origin/main): its headline build command was
+    `lake build economy` while `lakefile.toml` declares one library, `Economy`
+    — Lake resolves a bare name as a target, case-sensitively, so the first
+    command the guide authorises does not exist. Fifteen lines across
+    CLAUDE.md and README.md also carried the literal two-character sequence
+    `\\'`, and the guide listed the rule numbers this very gate cites in its
+    violation messages with nothing checking that the numbers still line up.
+    No leg of the old gate read a word of it. This class pins each leg of
+    `guide_violations`, including the boundaries it deliberately does not
+    cross: a sentence is not a command, a shell escape is not residue, and the
+    generated census block is the one sanctioned copy of a count.
+    """
+
+    def guide(self, text, **kw):
+        write(os.path.join(self.root, "CLAUDE.md"), text)
+        return A.guide_violations(self.root, **kw)
+
+    def only(self, violations, needle):
+        return [x for x in violations if needle in x]
+
+    def test_fixture_guide_is_clean(self):
+        self.assertEqual(A.guide_violations(self.root), [])
+
+    def test_missing_guide_is_reported(self):
+        os.remove(os.path.join(self.root, "CLAUDE.md"))
+        v = A.guide_violations(self.root)
+        self.assertEqual(len(v), 1, v)
+        self.assertIn("CLAUDE.md is missing", v[0])
+
+    def test_undeclared_lake_target_is_named_with_the_declared_one(self):
+        # The aeeca347 defect, reproducible: a case-twin of a real target.
+        v = self.guide(GUIDE.replace("`lake build Economy`", "`lake build economy`"))
+        hits = self.only(v, "lake build economy")
+        self.assertEqual(len(hits), 1, v)
+        self.assertIn("case-sensitive", hits[0])
+        self.assertIn("`economy` differs from `Economy` by case alone", hits[0])
+        self.assertIn("lake build Economy", hits[0])
+
+    def test_package_path_and_flag_forms_are_not_target_names(self):
+        for tok in ("@fixture/Economy", "Economy/Foo.lean", "+Economy", "-j"):
+            v = self.guide(GUIDE.replace("`lake build Economy`", "`lake build %s`" % tok))
+            self.assertEqual(self.only(v, "lake build"), [], tok)
+
+    def test_unreadable_lake_authority_is_named_not_skipped(self):
+        os.remove(os.path.join(self.root, "lakefile.toml"))
+        v = A.guide_violations(self.root)
+        hits = self.only(v, "authority is unreadable")
+        self.assertEqual(len(hits), 1, v)
+        self.assertIn("no lakefile.toml", hits[0])
+
+    def test_unknown_make_rule_is_reported_with_the_rules_that_exist(self):
+        v = self.guide(GUIDE.replace("`make proof`", "`make proofs`"))
+        hits = self.only(v, "make proofs")
+        self.assertEqual(len(hits), 1, v)
+        self.assertIn("census, proof", hits[0])
+
+    def test_a_sentence_about_making_is_not_a_make_command(self):
+        # "does this change make the math clearer" is prose; the guide says it.
+        text = GUIDE + "\nAsk whether a change make the math clearer, or make\n"
+        self.assertEqual(self.only(self.guide(text), "make"), [])
+
+    def test_dead_spine_module_is_reported_from_table_and_bullet(self):
+        v = self.guide(GUIDE.replace("| `Foo` |", "| `Foobar` |"))
+        hits = self.only(v, "Economy/Foobar.lean")
+        self.assertEqual(len(hits), 1, v)
+        self.assertIn("edits nothing", hits[0])
+        v = self.guide(GUIDE.replace("- `Bar` —", "- `Baz` —"))
+        self.assertEqual(len(self.only(v, "Economy/Baz.lean")), 1, v)
+
+    def test_gate_rule_citation_must_still_be_a_numbered_rule(self):
+        self.assertEqual(self.guide(GUIDE, gate_source="banned (hard rule 2)"), [])
+        v = self.guide(GUIDE, gate_source="banned (hard rule 7) and (hard rule 2)")
+        hits = self.only(v, "hard rule 7")
+        self.assertEqual(len(hits), 1, v)
+        self.assertIn("1, 2, 3", hits[0])
+
+    def test_gone_invariant_word_is_reported(self):
+        v = self.guide(GUIDE.replace("kernel-clean under `[propext, "
+                                     "Classical.choice, Quot.sound]`",
+                                     "kernel-clean"))
+        self.assertEqual(len(self.only(v, "no longer states the invariant")), 1, v)
+
+    def test_escaped_quote_residue_is_reported_inside_a_fence_too(self):
+        text = (GUIDE + "\nIf it doesn\\'t, you have work to do.\n\n"
+                "```bash\nmake proof  # won\\'t be skipped\n```\n")
+        v = self.guide(text)
+        self.assertEqual(len(self.only(v, "quoting residue")), 2, v)
+
+    def test_a_real_shell_escape_is_not_residue(self):
+        text = GUIDE + "\n```bash\necho 'it\\'s a guard'\n```\n"
+        self.assertEqual(self.only(self.guide(text), "quoting residue"), [])
+
+    def test_hand_typed_count_is_reported_in_prose_only(self):
+        v = self.guide(GUIDE + "\nThe corpus has 325 theorems.\n")
+        hits = self.only(v, "hand-typed count")
+        self.assertEqual(len(hits), 1, v)
+        self.assertIn("325 theorems", hits[0])
+        # A fence is the machine's copy and an inline span is expected output:
+        # neither is a claim the guide is hand-typing.
+        text = (GUIDE + "\n```text\naxioms: 3\n```\n"
+                "verify that the output shows `sorry: 0   axioms: 0`\n")
+        self.assertEqual(self.only(self.guide(text), "hand-typed count"), [])
+
+    def test_split_markdown_separates_the_two_surfaces(self):
+        # Every leg above decides what a line MEANS by which surface it is on,
+        # so the split itself is the contract: a fence is a command, a backtick
+        # span is a command inside a sentence, and line numbers survive both.
+        text = "# t\n\nrun `make proof` here\n\n```bash\nmake proof\n```\nlast\n"
+        prose, cmds = A.split_markdown(text)
+        self.assertEqual([n for n, _ in prose], [1, 2, 3, 4, 8])
+        self.assertIn((3, "make proof"), cmds)
+        self.assertIn((6, "make proof"), cmds)
+        self.assertNotIn(5, [n for n, _ in prose])
+        self.assertEqual(A.strip_inline_code("run `make proof` here"), "run   here")
+
+    def test_evaluate_runs_the_leg_and_the_switch_opts_out(self):
+        write(os.path.join(self.root, "CLAUDE.md"),
+              GUIDE.replace("`lake build Economy`", "`lake build economy`"))
+        rc, _, report = A.evaluate(self.root)
+        self.assertEqual(rc, 1)
+        self.assertEqual(len(self.only(report["violations"], "lake build economy")), 1)
+        rc, _, report = A.evaluate(self.root, skip_guide=True)
+        self.assertEqual((rc, report["violations"]), (0, []), report["violations"])
+        self.assertEqual(
+            A.main(["--root", self.root, "--check", "--quiet", "--skip-guide"]), 0)
 
 
 # --------------------------------------------------------------------------
@@ -949,6 +1139,18 @@ class RealCorpus(unittest.TestCase):
 
     def test_ci_yaml_wires_the_gate(self):
         self.assertEqual(A.ci_violations(REPO_ROOT), [])
+
+    def test_prose_doc_contract_is_pinned_at_head(self):
+        """The guide is the surface an assistant reads first, and at aeeca347 it
+        was the one surface nothing read: it authorised `lake build economy`,
+        a target Lake cannot resolve (the corpus declares `Economy`), and it
+        carried `\\'` residue on ten lines, five more in the README. Both are
+        red here if they come back, so the next case-twin command is caught by
+        `make audit` rather than by a reader whose build refuses to start."""
+        self.assertEqual(A.guide_violations(REPO_ROOT), [])
+        guide = A.read_text(os.path.join(REPO_ROOT, A.GUIDE_REL))
+        self.assertIn("lake build Economy", guide)
+        self.assertNotIn("\\'", guide)
 
     def test_subprocess_exit_codes(self):
         ok = subprocess.run([sys.executable, os.path.join(SCRIPT_DIR, "audit_axioms.py"),

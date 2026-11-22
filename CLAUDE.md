@@ -14,18 +14,19 @@ Before committing anything, run:
 make proof
 ```
 
-and verify that the output shows `sorry: 0   axioms: 0   build: GREEN   sound: CLEAN`. If it doesn\'t, you have work to do.
+and verify that the output shows `sorry: 0   axioms: 0   build: GREEN   sound: CLEAN`. If it doesn't, you have work to do.
 
 ## The toolchain
 
 - Lean 4 + Mathlib; the exact toolchain is whatever `lean-toolchain` pins (read the file, not this sentence). `lake-manifest.json` is tracked; the commit-time snapshot gate requires it.
-- `lake build economy` for a full build (~12s cached, ~45s cold).
+- `lake build Economy` for a full build (the library is `Economy`; `economy` is the package, and Lake target names are case-sensitive — `@economy` is how you name the package). ~12s cached, ~45s cold on a warm Mathlib.
 - `lake env lean Economy/Foo.lean` for single-file type-check (~7s). Use this for iteration. Never run a full `lake build` in the middle of a proof exploration.
 - `make proof` for the canonical build + report used by the daemon, the blog footer, and the statusline.
+- `make audit` for the static soundness gate, which reads this file too: every command it authorises must name a rule the `Makefile` defines or a target `lakefile.toml` declares, every module the spine below lists must exist under `Economy/`, and every rule number the gate cites in a violation message must still be a numbered rule here. A command that does not run is a defect in this page, not a quirk of your shell.
 
 ## Editing .lean files
 
-**Use Python file I/O, not the Edit or Write tool.** Claude Code\'s diagnostic system auto-modifies .lean files between tool calls, which corrupts multi-hunk edits. The canonical pattern:
+**Use Python file I/O, not the Edit or Write tool.** Claude Code's diagnostic system auto-modifies .lean files between tool calls, which corrupts multi-hunk edits. The canonical pattern:
 
 ```python
 p = "Economy/Foo.lean"
@@ -46,7 +47,7 @@ Then immediately verify with `lake env lean Economy/Foo.lean 2>&1 | tail -20`. W
 
 4. **Tier discipline.** Every file opens with a tier label (THEOREM / FRAMEWORK / NUMERICAL OBSERVATION). Never state a framework claim as a theorem. Never cite an observation as if it were proved from first principles.
 
-5. **Truth-check before proving.** If you\'re stuck on a sorry for more than about 30 minutes, the statement might be false. Substitute concrete numbers. Check the limit as any parameter approaches its boundary. A sorry on a false statement wastes all downstream work.
+5. **Truth-check before proving.** If you're stuck on a sorry for more than about 30 minutes, the statement might be false. Substitute concrete numbers. Check the limit as any parameter approaches its boundary. A sorry on a false statement wastes all downstream work.
 
 6. **No `decide` or `native_decide` on real-valued goals.** `decide` is for `Decidable` props. Real-valued arithmetic needs `norm_num`, `nlinarith`, `positivity`, `linarith`, `field_simp`, or `ring`.
 
@@ -79,25 +80,25 @@ refreshes and checks it.
 
 **Adding a new empirical anchor.** Put the number in `Economy/Empirical.lean` as a named `def` with a docstring citing the source. Cross-reference in `REFERENCES.md`. Do not inline literal numbers in proofs — always go through the named def.
 
-**Adding a new theorem.** Put it in the smallest existing module that makes sense. Name it so the blog can cite it as `Module.theorem_name`. Open with a one-line docstring describing what it says economically. Close with `#print axioms theorem_name` in a comment at the top of the module if it\'s a headline theorem — that\'s the audit trail.
+**Adding a new theorem.** Put it in the smallest existing module that makes sense. Name it so the blog can cite it as `Module.theorem_name`. Open with a one-line docstring describing what it says economically. Close with `#print axioms theorem_name` in a comment at the top of the module if it's a headline theorem — that's the audit trail.
 
 **Changing a calibration.** Edit `Economy/Calibration.lean`. The subtype constraints will catch out-of-range values at compile time. Re-run V1-V6 validations to confirm the sanity checks still hold.
 
-**Closing a sorry.** Sorries shouldn\'t exist in this repo, but if one gets introduced in a WIP branch, attack it in this order: (a) does the statement parse correctly, (b) is it true numerically at concrete values, (c) does a Mathlib one-liner close it, (d) does decomposition into sub-lemmas expose the blocker. If none of those work, the statement is probably too strong and should be weakened.
+**Closing a sorry.** Sorries shouldn't exist in this repo, but if one gets introduced in a WIP branch, attack it in this order: (a) does the statement parse correctly, (b) is it true numerically at concrete values, (c) does a Mathlib one-liner close it, (d) does decomposition into sub-lemmas expose the blocker. If none of those work, the statement is probably too strong and should be weakened.
 
 ## What not to do
 
-- Do not introduce Mathlib dependencies you can\'t justify. The corpus is deliberately lightweight.
+- Do not introduce Mathlib dependencies you can't justify. The corpus is deliberately lightweight.
 - Do not add `@[simp]` attributes. Every use of `simp` in this repo is scoped with `simp only [...]` listing the lemmas explicitly.
 - Do not use `omega` on goals over ℝ. It only handles ℕ and ℤ.
-- Do not paper over a regression. If a change breaks a theorem, figure out what broke and why. Don\'t just wrap the theorem in a weaker statement to make it compile.
+- Do not paper over a regression. If a change breaks a theorem, figure out what broke and why. Don't just wrap the theorem in a weaker statement to make it compile.
 - Do not commit a broken build. Ever. The statusline and the blog both key off `make proof` output.
 
-## The author\'s note
+## The author's note
 
 This is a small corpus with a focused goal. It is not trying to be a complete DSGE model, a macroeconometric forecast, or an AI safety framework. It is trying to show that a small number of structural claims about the current US economy are self-consistent and can be stated precisely enough to be machine-checked.
 
-Everything here is in service of that one claim. When you work on this corpus, ask: *does this change make the math clearer, the claims stronger, or the receipts more honest?* If not, don\'t make the change.
+Everything here is in service of that one claim. When you work on this corpus, ask: *does this change make the math clearer, the claims stronger, or the receipts more honest?* If not, don't make the change.
 
 And always, before you commit:
 

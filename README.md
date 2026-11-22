@@ -26,7 +26,7 @@ The blog post at tim.awkronos.com/economy makes three kinds of claims.
 
 The point of this repository is that all three layers are separable. If you think the calibration is wrong, change it and see what happens. If you think the model is wrong, you can point at a specific theorem and say "this one is too strong" or "this one is false." If you think an empirical number is out of date, you can update it in one place.
 
-## What it isn\'t
+## What it isn't
 
 - Not a forecast of unemployment. The model does not predict unemployment numbers. It predicts *shapes* — under these assumptions, the labor-share trajectory goes like this.
 - Not a claim that AI is good or bad. It is a claim that the current numbers are self-consistent under a specific mathematical framework.
@@ -113,7 +113,7 @@ The foundation is **Cobb-Douglas production**:
 Y = A · K^(1−α) · L^α
 ```
 
-where `Y` is output, `A` is productivity, `K` is capital, `L` is labor, and `α ≈ 0.6` is labor\'s share of income. This is a 1928 formula, still the workhorse of applied macroeconomics, and it has a surprising property: it is **concave in each input**. Halving the workforce only drops output by about a third.
+where `Y` is output, `A` is productivity, `K` is capital, `L` is labor, and `α ≈ 0.6` is labor's share of income. This is a 1928 formula, still the workhorse of applied macroeconomics, and it has a surprising property: it is **concave in each input**. Halving the workforce only drops output by about a third.
 
 From that foundation, the model adds five layers.
 
@@ -160,7 +160,7 @@ That is the single-theorem version. `scripts/audit_axioms.py --verify-kernel` is
 
 Every empirical parameter is in `Economy/Calibration.lean`. The three canonical calibrations are `calBEA2026`, `calBaseline`, and `calPessimistic`. Each is a `ModelCalibration` struct with fields like:
 
-- `α` — labor\'s share of national income (BEA: 0.60)
+- `α` — labor's share of national income (BEA: 0.60)
 - `H_min` — shortest task length AI can handle today (METR baseline: 1 month unit)
 - `H_max` — saturation horizon (AEI exposure data: 12 months)
 - `β_slope` — METR regression slope in nats/month (current fast: log 2 / 4)
@@ -195,7 +195,7 @@ Economy/
   Basic.lean                   types: ExposureShare, Elasticity
   Calibration.lean             ModelCalibration + three canonical calibrations + V1-V6 validations
   IntelligenceTrajectory.lean  exponential doubling dynamics + task-horizon/exposure maps
-  TaskModel.lean               Cobb-Douglas foundation + Hulten\'s theorem
+  TaskModel.lean               Cobb-Douglas foundation + Hulten's theorem
   CES.lean                     CES aggregation + σ→1 limit to Cobb-Douglas
   Exposure.lean                task-exposure aggregation
   Macro.lean                   Solow growth + Ghost GDP identity + factor-income Euler
@@ -243,4 +243,4 @@ MIT. Use it, fork it, argue with it. If you find a calibration you believe in mo
 
 Tim Jacoby, Awkronos. The blog post is at [tim.awkronos.com/economy](https://tim.awkronos.com/economy).
 
-*The same math that signed this off would sign off on the thing you\'ve been meaning to build.*
+*The same math that signed this off would sign off on the thing you've been meaning to build.*

@@ -30,7 +30,15 @@ default / ``--check``
       ``forecast_violations``);
     * ``.github/workflows/ci.yml`` invariants, including symlink-safe cache
       seeding (a symlinked ``.lake/packages/<pkg>`` prefix lets an unguarded
-      ``lake exe cache get`` write through into the machine-wide cache).
+      ``lake exe cache get`` write through into the machine-wide cache);
+    * the prose-doc contract: every ``make``/``lake build`` command the guide
+      or the README authorises must name a rule the Makefile defines or a
+      target ``lakefile.toml`` declares, every module the guide's spine
+      inventories must exist, every ``hard rule <n>`` this script cites must
+      still be a numbered rule in ``CLAUDE.md``, and no prose may carry
+      ``\\'``-style quoting residue or a hand-typed count (``CLAUDE.md``
+      forbids copying counts in; the generated census block is the one
+      sanctioned copy). See ``guide_violations``.
 
 ``--verify-kernel``
     Everything above, plus the compiler: generate ``#print axioms`` probe
@@ -1006,6 +1014,331 @@ def run_steps(text):
 
 
 # --------------------------------------------------------------------------
+# Assistant-guide and prose-doc contract
+# --------------------------------------------------------------------------
+#
+# CLAUDE.md is not the page a reader arrives at from the blog — README.md is.
+# It is the operating manual an AI assistant reads before it touches a proof,
+# and an assistant reads it RAW, so every command it spells is a command that
+# gets run and every name it spells is a name someone edits. Measured at
+# aeeca347 (origin/main, 2026-11-20), two classes of rot sat in that surface
+# with nothing watching:
+#
+#   * `CLAUDE.md:22` told the reader to run `lake build economy`. The corpus
+#     declares ONE library, `Economy` (`lakefile.toml`: `defaultTargets =
+#     ["Economy"]`, `[[lean_lib]] name = "Economy"`), and both `make build`
+#     and the CI "Build corpus" step say `lake build Economy`. Lake resolves a
+#     bare name as a TARGET and `@name` as a package (`lake help build`:
+#     "`a` default facet(s) of target `a`; `@a` default target(s) of package
+#     `a`"), and target names are case-sensitive, so the guide's own headline
+#     build command is an unknown-target error. This lane could not confirm it
+#     by running it: the compile gate refused with rc 76
+#     (`compiler_units_uninspectable_at_cap:census_instrument_fault:probe_rc_255`)
+#     on a host at load1 67, and seat law is to report a gate refusal, never
+#     compile around it. The defect therefore rests on the two files the leg
+#     reads (the guide's claim, the lakefile's declaration) and Lake's own
+#     printed grammar — which is exactly the evidence the leg uses, so no
+#     compiler is needed to keep it from coming back.
+#   * Ten lines of CLAUDE.md and five of README.md carried the literal
+#     two-character sequence `\'` (`doesn\'t`) — quoting residue from a
+#     shell-escaped write. CommonMark happens to swallow it in a rendered
+#     page, which is why nobody saw it; the consumer that reads these files
+#     raw is every assistant, and for it the file says `doesn\'t`.
+#
+# The gate already watched the Lean, the README census, the forecast table and
+# ci.yml, and never once read the guide. These legs close that last prose
+# surface, and they read CLAUDE.md's own two stated rules as contracts: the
+# invariant sentence ("zero sorry, zero user-defined axioms, kernel-clean under
+# [propext, Classical.choice, Quot.sound]") and "Do not copy theorem, sorry,
+# axiom, build, or commit counts into this repository" — the latter measured
+# CLEAN of any count-shaped claim at aeeca347, so the leg costs nothing today
+# and stops the exact drift the prose forbids.
+#
+# Scope, stated so it is not mistaken for more than it is: the command, debris
+# and count legs run over every prose doc; the module-inventory leg runs over
+# CLAUDE.md alone (the README's theorem receipts are already resolved by
+# `readme_violations` against the compiled census). The legs are
+# ONE-DIRECTIONAL on purpose: a guide may name a subset of the corpus — it
+# lists the spine, not all 29 modules — but nothing it names as a fact may be
+# absent from the repo. A guide pointing at a target, a rule, a module or a
+# command that does not exist is worse than no guide.
+
+#: The assistant-facing manual. Its name is also the gate's own citation
+#: target ("CLAUDE.md hard rule 2"), which the rule-citation leg keeps honest.
+GUIDE_REL = "CLAUDE.md"
+
+#: Markdown a consumer reads as claims: the guide, the human page, the source
+#: list, and the published forecast receipts.
+DOC_RELS = (GUIDE_REL, "README.md", "REFERENCES.md", FORECAST_REL)
+
+#: Commands the guide authorises, and the file that says whether they exist.
+#: A fenced block or an inline code span is a command; a sentence is prose.
+#: Splitting them this way is what keeps "does this change make the math
+#: clearer" out of the Makefile and `sorry: 0` out of the count leg.
+_MD_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+_MD_INLINE_CODE_RE = re.compile(r"`([^`\n]*)`")
+_LAKE_BUILD_RE = re.compile(r"\blake\s+build\s+(\S+)")
+_MAKE_RE = re.compile(r"(?<![A-Za-z0-9_])make\s+([A-Za-z][A-Za-z0-9_.-]*)")
+_BARE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+#: `\'` and `\"` BETWEEN WORD CHARACTERS: CommonMark swallows these, so a
+#: renderer never showed the residue and only a raw reader (an assistant)
+#: inherits it. Two guards keep a real escape out of the finding: the
+#: letter-on-both-sides anchor, and the line must carry no bare quote once the
+#: escaped ones are removed — `echo 'it\'s'` has a live quoting context, while
+#: `doesn\'t` has nothing but the residue. Because a fenced listing is read raw
+#: too, this leg scans whole lines rather than the prose surface.
+_MD_ESCAPE_DEBRIS_RE = re.compile(r"(?<=[A-Za-z])\\['\"](?=[A-Za-z])")
+
+#: A hand-typed count: a number on either side of a census noun. The census
+#: block this rule forbids lives inside a fenced block, so the prose-only
+#: surface already exempts the machine-generated copy.
+_MD_COUNT_RE = re.compile(
+    r"\b\d[\d,]*\s+(theorems?|lemmas?|declarations?|modules?|files|axioms?|"
+    r"sorries|commits|builds?)\b"
+    r"|\b(theorems?|lemmas?|declarations?|modules?|files|axioms?|sorry|"
+    r"axiom|commits?|build)\s*[:=]\s*\d",
+    re.I,
+)
+
+#: Shapes of the guide's module inventory: a spine table's first cell, and a
+#: failure-mode bullet's label.
+_SPINE_ROW_RE = re.compile(r"^\s*\|\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*\|")
+_SPINE_BULLET_RE = re.compile(r"^\s*[-*]\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*[—–-]")
+_HARD_RULE_HEADING_RE = re.compile(r"^#{1,6}\s.*hard rule", re.I)
+_HARD_RULE_ITEM_RE = re.compile(r"^\s*(\d+)\.\s")
+_HEADING_RE = re.compile(r"^#{1,6}\s")
+_GATE_RULE_CITE_RE = re.compile(r"hard rule\s+(\d+)")
+
+
+def read_text(path):
+    with open(path, "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+def split_markdown(text):
+    """(prose_lines, command_lines) as lists of `(line_no, line)`.
+
+    Fenced blocks and inline code spans are commands: they are what a reader
+    copies. Everything else is prose: what a reader believes. Prose lines keep
+    their code spans — the spine table's module names ARE backticked — and a
+    leg that wants the sentence without its commands calls `strip_inline_code`.
+    Line numbers are kept on both sides so a violation names a place, and a
+    fence delimiter counts as a command line so an odd fence cannot shift the
+    numbering.
+    """
+    prose, cmds = [], []
+    fence = False
+    for no, line in enumerate(text.splitlines(), start=1):
+        if _MD_FENCE_RE.match(line):
+            fence = not fence
+            cmds.append((no, line))
+            continue
+        if fence:
+            cmds.append((no, line))
+            continue
+        for span in _MD_INLINE_CODE_RE.finditer(line):
+            cmds.append((no, span.group(1)))
+        prose.append((no, line))
+    return prose, cmds
+
+
+def strip_inline_code(line):
+    """A prose line with its commands removed, for legs that read sentences."""
+    return _MD_INLINE_CODE_RE.sub(" ", line)
+
+
+def lake_targets(root):
+    """Target names `lakefile.toml` declares, as a set.
+
+    Returns `(None, reason)` when there is no parsed authority to check a
+    build command against: a leg that cannot resolve a name says so instead of
+    certifying it. `[[lean_lib]]` / `[[lean_exe]]` names and `defaultTargets`
+    are what `lake build <bare-name>` can mean; the TOML is read by regex
+    because this gate runs on a stock `python3` with no `tomllib` (3.11+).
+    """
+    path = os.path.join(root, "lakefile.toml")
+    if not os.path.isfile(path):
+        if os.path.isfile(os.path.join(root, "lakefile.lean")):
+            return None, "lakefile.lean (the DSL form) is not parsed by this leg"
+        return None, "no lakefile.toml at %s" % root
+    text = read_text(path)
+    names = set()
+    section = None
+    for line in text.splitlines():
+        m = re.match(r"\s*\[\[([A-Za-z_]+)\]\]\s*$", line)
+        if m:
+            section = m.group(1)
+            continue
+        if re.match(r"\s*\[[^\]]+\]\s*$", line):
+            section = None
+            continue
+        m = re.match(r'\s*name\s*=\s*"([^"]+)"\s*$', line)
+        if m and section in ("lean_lib", "lean_exe"):
+            names.add(m.group(1))
+        m = re.match(r"\s*defaultTargets\s*=\s*\[([^\]]*)\]", line)
+        if m:
+            names.update(re.findall(r'"([^"]+)"', m.group(1)))
+    return names, ""
+
+
+def make_targets(root):
+    """Rule names the `Makefile` can build, including its `.PHONY` list."""
+    path = os.path.join(root, "Makefile")
+    if not os.path.isfile(path):
+        return None
+    names = set()
+    for line in read_text(path).splitlines():
+        m = re.match(r"^\.PHONY\s*:?(.*)$", line)
+        if m:
+            names.update(w for w in m.group(1).split() if w)
+            continue
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_.-]*)\s*:(?!=)", line)
+        if m:
+            names.add(m.group(1))
+    return names
+
+
+def guide_hard_rules(lines):
+    """The numbers of the guide's numbered hard-rule list, in order.
+
+    The list lives under the heading that names it and ends at the next
+    heading, so a `1.` in some unrelated numbered prose cannot stand in for a
+    rule the gate cites.
+    """
+    numbers, inside = [], False
+    for _, line in lines:
+        if _HARD_RULE_HEADING_RE.match(line):
+            inside = True
+            continue
+        if inside and _HEADING_RE.match(line):
+            break
+        if inside:
+            m = _HARD_RULE_ITEM_RE.match(line)
+            if m:
+                numbers.append(int(m.group(1)))
+    return numbers
+
+
+def guide_violations(root, docs=None, gate_source=None):
+    """Every claim the prose docs make that the repository does not honor.
+
+    `docs` maps a relative path to its text and `gate_source` is the audit
+    script's own text; both default to what is on disk, and a test may pass
+    them so one leg can be exercised without rebuilding a whole fixture.
+    """
+    v = []
+    if docs is None:
+        docs = {}
+        for rel in DOC_RELS:
+            path = os.path.join(root, rel)
+            if os.path.isfile(path):
+                docs[rel] = read_text(path)
+    guide_rel = GUIDE_REL
+    if guide_rel not in docs:
+        return ["%s is missing — nothing tells an assistant the invariant, and "
+                "the gate's own violation messages cite it by rule number" % guide_rel]
+
+    guide_prose, _guide_cmds = split_markdown(docs[guide_rel])
+
+    # 1. The invariant the whole corpus rests on must still be stated.
+    raw = docs[guide_rel]
+    for token in ("sorry", "axiom") + ALLOWED_AXIOMS[:1]:
+        if token not in raw:
+            v.append("%s no longer states the invariant: the word %r is gone, so "
+                     "the sentence the gate enforces has no carrier" % (guide_rel, token))
+
+    # 2. `make <target>` / `lake build <target>` are only as good as the file
+    #    that declares them. A bare name is checked case-exactly: Lake target
+    #    names are case-sensitive, which is how `economy` escaped for a month.
+    declared, why = lake_targets(root)
+    rules = make_targets(root)
+    for rel, text in sorted(docs.items()):
+        _prose, cmds = split_markdown(text)
+        for no, line in cmds:
+            for m in _LAKE_BUILD_RE.finditer(line):
+                tok = m.group(1).strip("\\")
+                if not _BARE_NAME_RE.match(tok):
+                    continue  # a path, a `+Module`, an `@pkg/x` or a flag: not a target name
+                if declared is None:
+                    v.append("%s:%d: `%s` names a Lake target but the authority is "
+                             "unreadable: %s" % (rel, no, m.group(0).strip(), why))
+                elif tok not in declared:
+                    near = [n for n in sorted(declared) if n.lower() == tok.lower()]
+                    v.append(
+                        "%s:%d: `%s` is not a target lakefile.toml declares (%s). "
+                        "Lake resolves a bare name as a target and `@%s` as a package, "
+                        "and target names are case-sensitive%s — the corpus builds "
+                        "with `%s`."
+                        % (rel, no, m.group(0).strip(), ", ".join(sorted(declared)) or "(none)",
+                           tok,
+                           "; `%s` differs from `%s` by case alone" % (tok, near[0]) if near else "",
+                           "lake build %s" % (near[0] if near else sorted(declared)[0] if declared else "<lib>")))
+            for m in _MAKE_RE.finditer(line):
+                tok = m.group(1)
+                if rules is None:
+                    v.append("%s:%d: `make %s` names a rule but there is no Makefile at "
+                             "%s to declare it" % (rel, no, tok, root))
+                elif tok not in rules:
+                    v.append("%s:%d: `make %s` is not a rule the Makefile defines (%s)"
+                             % (rel, no, tok, ", ".join(sorted(rules))))
+
+    # 3. The spine the guide lists must be files that exist.
+    for no, line in guide_prose:
+        for rx in (_SPINE_ROW_RE, _SPINE_BULLET_RE):
+            m = rx.match(line)
+            if not m:
+                continue
+            name = m.group(1)
+            if not os.path.isfile(os.path.join(root, "Economy", name + ".lean")):
+                v.append("%s:%d: the guide lists module `%s` but `Economy/%s.lean` "
+                         "does not exist — a reader sent to edit it edits nothing"
+                         % (guide_rel, no, name, name))
+            break
+
+    # 4. The gate cites rules by number; the guide must still have them.
+    if gate_source is None:
+        gate = os.path.join(root, "scripts", "audit_axioms.py")
+        gate_source = read_text(gate) if os.path.isfile(gate) else ""
+    cited = sorted({int(n) for n in _GATE_RULE_CITE_RE.findall(gate_source)})
+    have = guide_hard_rules(guide_prose)
+    for n in cited:
+        if n not in have:
+            v.append("%s: the gate cites `CLAUDE.md hard rule %d` in a violation "
+                     "message, but the guide's numbered rule list is %s — a reader "
+                     "following a red build to the rule that bans it finds nothing"
+                     % (guide_rel, n, ", ".join(str(x) for x in have) or "absent"))
+
+    # 5-6. Document hygiene over every prose doc: escaped residue, which a raw
+    #      reader sees anywhere including inside a listing, and hand-typed
+    #      counts, which are a claim only in prose — the generated census block
+    #      is a fence, and it is the one copy of the numbers this repository
+    #      sanctions.
+    for rel, text in sorted(docs.items()):
+        for no, line in enumerate(text.splitlines(), start=1):
+            unescaped = line.replace("\\'", "").replace('\\"', "")
+            for m in _MD_ESCAPE_DEBRIS_RE.finditer(line):
+                if m.group(0)[1] in unescaped:
+                    # A bare quote survives on this line, so the backslash is
+                    # doing real quoting work (`echo 'it\'s'`, a Lisp string),
+                    # not leaving residue behind.
+                    continue
+                v.append("%s:%d: %r is quoting residue, not markdown — CommonMark "
+                         "eats the backslash but every assistant reads this file raw "
+                         "and sees it" % (rel, no, m.group(0)))
+        prose, _ = split_markdown(text)
+        for no, line in prose:
+            m = _MD_COUNT_RE.search(strip_inline_code(line))
+            if m:
+                v.append("%s:%d: `%s` is a hand-typed count. %s forbids copying "
+                         "theorem/sorry/axiom/build counts into the repository: the "
+                         "generated census block in README.md (or `make census`) is "
+                         "the only sanctioned copy, because only it moves with the "
+                         "corpus" % (rel, no, m.group(0).strip(), guide_rel))
+    return v
+
+
+# --------------------------------------------------------------------------
 # Kernel verification
 # --------------------------------------------------------------------------
 
@@ -1306,6 +1639,7 @@ def kernel_violations(c, found, unknown, errors, notes, lost=()):
 
 
 def evaluate(root, verify_kernel=False, skip_readme=False, skip_ci=False,
+             skip_guide=False,
              batch=80, timeout=None, lake=None, log=None,
              slot_wait=None, use_slot=True, slot_script=None):
     """Run the requested gates. Returns (exit_code, census, report).
@@ -1323,6 +1657,8 @@ def evaluate(root, verify_kernel=False, skip_readme=False, skip_ci=False,
         report["violations"].extend(forecast_violations(root, c))
     if not skip_ci:
         report["violations"].extend(ci_violations(root))
+    if not skip_guide:
+        report["violations"].extend(guide_violations(root))
     if verify_kernel:
         status = {}
         try:
@@ -1443,6 +1779,9 @@ def main(argv=None):
     ap.add_argument("--lake", default=None, help="lake executable")
     ap.add_argument("--skip-readme", dest="skip_readme", action="store_true")
     ap.add_argument("--skip-ci", dest="skip_ci", action="store_true")
+    ap.add_argument("--skip-guide", dest="skip_guide", action="store_true",
+                    help="skip the prose-doc contract (CLAUDE.md/README commands, "
+                         "module inventory, escaped residue, hand-typed counts)")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--print-census", dest="print_census", action="store_true",
                     help="print the README census block for this corpus and exit")
@@ -1461,7 +1800,8 @@ def main(argv=None):
     log = (lambda msg: None) if args.quiet else print
     rc, c, report = evaluate(
         root, verify_kernel=args.verify_kernel, skip_readme=args.skip_readme,
-        skip_ci=args.skip_ci, batch=args.batch, timeout=args.timeout,
+        skip_ci=args.skip_ci, skip_guide=args.skip_guide,
+        batch=args.batch, timeout=args.timeout,
         lake=args.lake, log=log, slot_wait=args.slot_wait, use_slot=args.use_slot)
     counts = c["counts"]
     if not args.quiet:
@@ -1483,7 +1823,8 @@ def main(argv=None):
                   "public theorem under [%s]" % ", ".join(ALLOWED_AXIOMS))
         else:
             print("CLEAN: 0 sorry, 0 native_decide, 0 user axioms; README census, "
-                  "forecast-table citations and CI wiring pinned")
+                  "forecast-table citations, CI wiring and the prose-doc contract "
+                  "pinned")
     elif rc == EX_TEMPFAIL:
         lost = report.get("kernel_lost") or []
         print("INCOMPLETE (exit %d): the static gate is clean but the kernel was never "
