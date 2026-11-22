@@ -3,3 +3,18 @@
 self-hosted-runner:
   labels:
     - lean
+    # RSI-FLOW-LABELSYNC-1122: kagami-nvme-checkout-canary.yml:10 asks for
+    # [self-hosted, kagami-nvme-economy], which was never declared here, so
+    # actionlint reports `label "kagami-nvme-economy" is unknown` on that
+    # workflow. The label is real, not aspirational:
+    # kagami/scripts/ops/runner_public_nvme_transaction.py is the sole writer,
+    # minting it via `PUT repos/awktavian/economy/actions/runners/<id>/labels`
+    # for the duration of one exclusive canary transaction and restoring the
+    # runner's prior label set on exit — so `gh api
+    # repos/awktavian/economy/actions/runners` shows it only while a canary
+    # runs (measured 2026-11-22, no transaction live: the runner carries
+    # self-hosted, macOS, ARM64, studio, lean, light, rust, xcode). The
+    # script's own `_workflow_canary_contract` check asserts the workflow's
+    # `runs-on` matches this exact label, so the whitelist and the runner-side
+    # label are two views of one fact. Additive only — `lean` stays.
+    - kagami-nvme-economy
