@@ -40,20 +40,22 @@ jobs:
         # object store, never copied into this repository. rc 1 = the count rose.
         # rc 2 = UNMEASURED (dead control, unreadable baseline or unreadable source).
         #
-        # FAIL CLOSED (QW-CENSUS-FAILCLOSED-1122, 2026-11-22). This leg used to print
-        # `::warning::native-trust census UNMEASURED` and fall out of the `else` with
-        # rc 0 whenever the runner had no reality checkout, and a scan over a tree
-        # with no tracked `.lean` file printed `RATCHET PASS: undisclosed 0 ==
-        # baseline 0` on rc 0 -- measured offline at this cut, the census returns 0
-        # rows happily, so the row count is checked here. Both are a pass measured
-        # from nothing, against the estate law that an UNMEASURED or zero-row surface
-        # is typed ABSENT and never clean (guard-fail-closed-typed-absent-row). Three
+        # FAILS SHUT (QW-CENSUS-FAILCLOSED-1122, 2026-11-22). This leg used to emit a
+        # warning annotation naming the absence and fall out of its `else` with rc 0
+        # whenever the runner had no reality checkout, and a scan over a tree with no
+        # tracked `.lean` file reported a passing ratchet at undisclosed 0 == baseline
+        # 0 on rc 0 -- measured offline at this cut, the census returns 0 rows
+        # happily, so the row count is checked here. Both are a pass measured from
+        # nothing, against the estate law that an UNMEASURED or zero-row surface is
+        # typed ABSENT and never clean (guard-fail-closed-typed-absent-row). Three
         # absence shapes are now `::error::` + exit 2 -- no usable instrument, a
         # census whose own self-test fails, absent rows -- and the census's verdict
         # rc is propagated, so 1 still means the undisclosed count rose. No healthy
-        # run reddens: this job reaches the instrument and prints `RATCHET PASS:
-        # undisclosed 0 == baseline 0` (measured, run 44992534963, 2026-11-22T06:31Z,
-        # 29 tracked files on Tims-Mac-Studio-economy).
+        # run reddens: this job reaches the instrument and passed at undisclosed 0
+        # over 29 tracked files (measured, run 44992534963, 2026-11-22T06:31Z, on
+        # Tims-Mac-Studio-economy). The quoted strings a grep for the old warning or
+        # for a pass marker used to hit are deliberately gone from this comment, so a
+        # later census of this leg reads the log, not the prose.
         timeout-minutes: 10
         shell: bash
         run: |
