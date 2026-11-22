@@ -344,4 +344,99 @@ theorem ces_sigma_lt_one_capital_ceiling_tendsto {σ α y2 : ℝ}
       (nhds ((1 - α) ^ (1 / sigmaToRho σ) * y2)) :=
   ces_capital_output_ceiling_tendsto ((sigmaToRho_neg_iff hσ0).mpr hσ1) hα0 hα1 hy2
 
+/-- THEOREM: marginal product of the first task input in the CES aggregate. -/
+theorem cesAggregate_hasDerivAt_fst {ρ α y1 y2 : ℝ} (hρ : ρ ≠ 0)
+    (hα0 : 0 < α) (hα1 : α < 1) (hy1 : 0 < y1) (hy2 : 0 < y2) :
+    HasDerivAt (fun x => cesAggregate ρ α x y2)
+      (α * (α * y1 ^ ρ + (1 - α) * y2 ^ ρ) ^ (1 / ρ - 1) * y1 ^ (ρ - 1)) y1 := by
+  have hS : 0 < α * y1 ^ ρ + (1 - α) * y2 ^ ρ := by
+    have := Real.rpow_pos_of_pos hy1 ρ
+    have := Real.rpow_pos_of_pos hy2 ρ
+    have : 0 < 1 - α := by linarith
+    positivity
+  have h1 : HasDerivAt (fun x : ℝ => x ^ ρ) (ρ * y1 ^ (ρ - 1)) y1 :=
+    Real.hasDerivAt_rpow_const (Or.inl hy1.ne')
+  have h2 : HasDerivAt (fun x : ℝ => α * x ^ ρ + (1 - α) * y2 ^ ρ)
+      (α * (ρ * y1 ^ (ρ - 1))) y1 := ((h1.const_mul α).add_const _)
+  have h3 := h2.rpow_const (p := 1 / ρ) (Or.inl hS.ne')
+  unfold cesAggregate
+  convert h3 using 1
+  field_simp
+
+/-- THEOREM: marginal product of the second task input. -/
+theorem cesAggregate_hasDerivAt_snd {ρ α y1 y2 : ℝ} (hρ : ρ ≠ 0)
+    (hα0 : 0 < α) (hα1 : α < 1) (hy1 : 0 < y1) (hy2 : 0 < y2) :
+    HasDerivAt (fun x => cesAggregate ρ α y1 x)
+      ((1 - α) * (α * y1 ^ ρ + (1 - α) * y2 ^ ρ) ^ (1 / ρ - 1) * y2 ^ (ρ - 1)) y2 := by
+  have hS : 0 < α * y1 ^ ρ + (1 - α) * y2 ^ ρ := by
+    have := Real.rpow_pos_of_pos hy1 ρ
+    have := Real.rpow_pos_of_pos hy2 ρ
+    have : 0 < 1 - α := by linarith
+    positivity
+  have h1 : HasDerivAt (fun x : ℝ => x ^ ρ) (ρ * y2 ^ (ρ - 1)) y2 :=
+    Real.hasDerivAt_rpow_const (Or.inl hy2.ne')
+  have h2 : HasDerivAt (fun x : ℝ => α * y1 ^ ρ + (1 - α) * x ^ ρ)
+      ((1 - α) * (ρ * y2 ^ (ρ - 1))) y2 := ((h1.const_mul (1 - α)).const_add _)
+  have h3 := h2.rpow_const (p := 1 / ρ) (Or.inl hS.ne')
+  unfold cesAggregate
+  convert h3 using 1
+  field_simp
+
+/-- THEOREM (MRS): ratio of marginal products is `α/(1-α) · (y1/y2)^(ρ-1)`,
+    i.e. `(y1/y2)^(-1/σ)` scaling with `ρ - 1 = -1/σ`. -/
+theorem ces_mrs {ρ α y1 y2 : ℝ}
+    (hα0 : 0 < α) (hα1 : α < 1) (hy1 : 0 < y1) (hy2 : 0 < y2) :
+    (α * (α * y1 ^ ρ + (1 - α) * y2 ^ ρ) ^ (1 / ρ - 1) * y1 ^ (ρ - 1)) /
+      ((1 - α) * (α * y1 ^ ρ + (1 - α) * y2 ^ ρ) ^ (1 / ρ - 1) * y2 ^ (ρ - 1))
+      = α / (1 - α) * (y1 / y2) ^ (ρ - 1) := by
+  have hS : 0 < α * y1 ^ ρ + (1 - α) * y2 ^ ρ := by
+    have := Real.rpow_pos_of_pos hy1 ρ
+    have := Real.rpow_pos_of_pos hy2 ρ
+    have : 0 < 1 - α := by linarith
+    positivity
+  have hP := Real.rpow_pos_of_pos hS (1 / ρ - 1)
+  have h1 := Real.rpow_pos_of_pos hy1 (ρ - 1)
+  have h2 := Real.rpow_pos_of_pos hy2 (ρ - 1)
+  have : 0 < 1 - α := by linarith
+  rw [Real.div_rpow hy1.le hy2.le]
+  field_simp
+
+/-- THEOREM (two-point Jensen for `x ↦ x^p`, `p ≥ 1`): convex combination bound. -/
+theorem rpow_two_mean_le {p a b x y : ℝ} (hp : 1 ≤ p) (ha : 0 ≤ a) (hb : 0 ≤ b)
+    (hab : a + b = 1) (hx : 0 ≤ x) (hy : 0 ≤ y) :
+    (a * x + b * y) ^ p ≤ a * x ^ p + b * y ^ p := by
+  have := (convexOn_rpow hp).2 (Set.mem_Ici.2 hx) (Set.mem_Ici.2 hy) ha hb hab
+  simpa [smul_eq_mul] using this
+
+/-- THEOREM (Jensen gap, `0 < ρ ≤ 1`): the CES aggregate never exceeds the
+    arithmetic mean of its inputs (power-mean inequality). -/
+theorem ces_le_arith_mean {ρ α y1 y2 : ℝ} (hρ0 : 0 < ρ) (hρ1 : ρ ≤ 1)
+    (hα0 : 0 ≤ α) (hα1 : α ≤ 1) (hy1 : 0 ≤ y1) (hy2 : 0 ≤ y2) :
+    cesAggregate ρ α y1 y2 ≤ α * y1 + (1 - α) * y2 := by
+  unfold cesAggregate
+  have hp : 1 ≤ 1 / ρ := by rw [le_div_iff₀ hρ0]; linarith
+  have h := rpow_two_mean_le (p := 1 / ρ) hp hα0 (by linarith : 0 ≤ 1 - α) (by ring)
+    (Real.rpow_nonneg hy1 ρ) (Real.rpow_nonneg hy2 ρ)
+  have e1 : (y1 ^ ρ) ^ (1 / ρ) = y1 := by
+    rw [← Real.rpow_mul hy1]; field_simp; simp
+  have e2 : (y2 ^ ρ) ^ (1 / ρ) = y2 := by
+    rw [← Real.rpow_mul hy2]; field_simp; simp
+  rw [e1, e2] at h
+  exact h
+
+/-- THEOREM (Jensen gap, `ρ ≥ 1`): the CES aggregate is at least the
+    arithmetic mean of its inputs. -/
+theorem arith_mean_le_ces {ρ α y1 y2 : ℝ} (hρ1 : 1 ≤ ρ)
+    (hα0 : 0 ≤ α) (hα1 : α ≤ 1) (hy1 : 0 ≤ y1) (hy2 : 0 ≤ y2) :
+    α * y1 + (1 - α) * y2 ≤ cesAggregate ρ α y1 y2 := by
+  unfold cesAggregate
+  have hρ0 : 0 < ρ := by linarith
+  have h := rpow_two_mean_le (p := ρ) hρ1 hα0 (by linarith : 0 ≤ 1 - α) (by ring) hy1 hy2
+  have hm : 0 ≤ α * y1 + (1 - α) * y2 := by
+    have : 0 ≤ 1 - α := by linarith
+    positivity
+  calc α * y1 + (1 - α) * y2 = ((α * y1 + (1 - α) * y2) ^ ρ) ^ (1 / ρ) := by
+        rw [← Real.rpow_mul hm]; field_simp; simp
+    _ ≤ _ := Real.rpow_le_rpow (Real.rpow_nonneg hm _) h (by positivity)
+
 end Economy
